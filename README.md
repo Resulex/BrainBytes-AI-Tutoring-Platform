@@ -26,7 +26,7 @@ BrainBytes is an AI-powered tutoring platform designed to provide accessible aca
 
 ---
 
-## Instructions for Running Your Application
+## Instructions for Running the Application
 
 ### Prerequisites
 - Docker and Docker Compose installed
