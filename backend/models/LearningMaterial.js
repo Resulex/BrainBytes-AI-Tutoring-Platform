@@ -60,8 +60,14 @@ learningMaterialSchema.pre('save', function(next) {
   next();
 });
 
-// Text index for search functionality
-learningMaterialSchema.index({ subject: 1, topic: 1 });
-learningMaterialSchema.index({ tags: 1 });
+// Text index for full-text search on topic, content, and tags
+learningMaterialSchema.index({ topic: 'text', content: 'text', tags: 'text' });
+
+// Compound indexes for filtered queries
+learningMaterialSchema.index({ subject: 1, topic: 1 }); // Subject browsing
+learningMaterialSchema.index({ subject: 1, difficulty: 1, isPublished: 1 }); // Filtered listings
+learningMaterialSchema.index({ createdBy: 1, createdAt: -1 }); // User's materials
+learningMaterialSchema.index({ tags: 1 }); // Tag-based queries
+learningMaterialSchema.index({ isPublished: 1, createdAt: -1 }); // Published materials feed
 
 module.exports = mongoose.model('LearningMaterial', learningMaterialSchema);

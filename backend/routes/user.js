@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const { authenticate } = require('../middleware/auth');
 
 // Create a new user profile
 router.post('/', async (req, res) => {
@@ -58,13 +59,18 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update a user profile
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticate, async (req, res) => {
   try {
-    const { name, email, preferredSubjects } = req.body;
+    const { name, email, bio, preferredSubjects } = req.body;
+    const updates = { updatedAt: Date.now() };
+    if (name !== undefined) updates.name = name;
+    if (email !== undefined) updates.email = email;
+    if (bio !== undefined) updates.bio = bio;
+    if (preferredSubjects !== undefined) updates.preferredSubjects = preferredSubjects;
     
     const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { name, email, preferredSubjects, updatedAt: Date.now() },
+      req.user._id,
+      updates,
       { new: true, runValidators: true }
     );
 
