@@ -2,15 +2,35 @@ version: '3'
 services:
   # Frontend container
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:3000
     ports:
       - "8080:3000"
     volumes:
       - ./frontend:/usr/src/app
       - /usr/src/app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
 
   # Backend API container
   backend:
@@ -21,10 +41,27 @@ services:
       - ./backend:/usr/src/app
       - /usr/src/app/node_modules
     environment:
-      - HUGGINGFACE_TOKEN=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  # Replace this with your token
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - JWT_SECRET=brainbytes-dev-secret-key-change-in-production
+      - NODE_ENV=production
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.2'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
 
   # MongoDB container
   mongo:
@@ -34,6 +71,20 @@ services:
     volumes:
       - mongo-data:/data/db
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.2'
+          memory: 256M
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo --quiet
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 5
 
 # Define volumes for persistent data
 volumes:
