@@ -5,9 +5,12 @@ BrainBytes is an AI-powered tutoring platform designed to provide accessible aca
 
 ## Team Members
 - Alex Resurreccion - Team Lead - lr.alresurreccion@mmdc.mcl.edu.ph
-- [Member Name] - Backend Developer - [email@mmdc.mcl.edu.ph]
-- [Member Name] - Frontend Developer - [email@mmdc.mcl.edu.ph]
-- [Member Name] - DevOps Engineer - [email@mmdc.mcl.edu.ph]
+- christenne jsele herrera - Backend Developer - 
+lr.cjherrera@mmdc.mcl.edu.ph
+- Harty Joy Villegas - Frontend Developer - 
+lr.hjvillegas@mmdc.mcl.edu.ph
+- Broose Henrik Membreve - DevOps Engineer - 
+lr.bhmembreve@mmdc.mcl.edu.ph
 
 ## Project Goals
 - Implement a containerized application with proper networking
@@ -24,6 +27,53 @@ BrainBytes is an AI-powered tutoring platform designed to provide accessible aca
 - Cloud Provider: Oracle Cloud Free Tier
 - Monitoring: Prometheus & Grafana
 
+## Project Structure
+
+```
+brainbytes-multi-container/
+├── backend/                        # Node.js Express API Server
+│   ├── middleware/                 # Custom Express middlewares
+│   ├── models/                     # Mongoose/Database schemas
+│   ├── node_modules/               # Backend dependencies (container-mapped)
+│   ├── public/
+│   │   └── icons/                  # Static asset icons
+│   ├── routes/                     # API route endpoints
+│   ├── scripts/                    # Automation or seeding scripts
+│   ├── socket/                     # WebSockets implementation (Real-time features)
+│   ├── tests/                      # Backend test suites
+│   ├── utils/                      # Helper & utility functions
+│   ├── .env                        # Local backend environment variables
+│   ├── aiService.js                # AI integration logic
+│   ├── Dockerfile                  # Backend container configuration
+│   ├── jest.config.js              # Jest testing configuration
+│   ├── package-lock.json
+│   ├── package.json
+│   └── server.js                   # Application entry point
+├── frontend/                       # Next.js Frontend Application
+│   ├── .next/                      # Next.js build cache directory
+│   ├── context/                    # React Context providers (State management)
+│   ├── hooks/                      # Custom React hooks
+│   ├── node_modules/               # Frontend dependencies (container-mapped)
+│   ├── pages/                      # Next.js Pages (Routing)
+│   │   ├── _app.js                 # Global Application wrapper
+│   │   ├── _document.js            # Custom Document structuring
+│   │   ├── dashboard.js            # Student Learning Analytics dashboard
+│   │   ├── index.js                # Landing / Login / Main Workspace page
+│   │   └── profile.js              # Student Profile settings page
+│   ├── public/                     # Static frontend assets
+│   ├── utils/                      # Frontend utilities
+│   ├── Dockerfile                  # Frontend container configuration
+│   ├── next.config.js              # Next.js configuration settings
+│   ├── package-lock.json
+│   ├── package.json
+│   └── .env                        # Local frontend environment variables
+├── .gitignore                      # Specified files to ignore in Git
+├── docker-compose.yml              # Multi-container multi-service orchestrator
+└── README.md                       # Main project documentation documentation
+
+```
+
+
 ---
 
 ## Instructions for Running the Application
@@ -38,8 +88,8 @@ BrainBytes is an AI-powered tutoring platform designed to provide accessible aca
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/brainbytes-multi-container.git
-   cd brainbytes-multi-container
+   git clone https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform.git
+   cd BrainBytes-AI-Tutoring-Platform
    ```
 
 2. **Configure environment variables**
@@ -56,7 +106,7 @@ BrainBytes is an AI-powered tutoring platform designed to provide accessible aca
    ```
 
 4. **Access the application**
-   - Frontend: http://localhost:3000
+   - Frontend: http://localhost:8080
    - Backend API: http://localhost:3000/api
    - MongoDB: localhost:27017 (if using local MongoDB)
 
@@ -91,7 +141,7 @@ BrainBytes is an AI-powered tutoring platform designed to provide accessible aca
    ```
 
 4. **Access the application**
-   - Frontend: http://localhost:3000
+   - Frontend: http://localhost:8080
    - Backend API: http://localhost:3001/api
 
 ---
@@ -266,15 +316,54 @@ GET /api/messages?limit=50&page=1
 ```javascript
 {
   _id: ObjectId,
-  name: String,              // User's full name
-  email: String,             // Email address (unique)
-  preferredSubjects: [       // Array of preferred subjects
-    String                   // e.g., "math", "science", "history"
+  role: String,              // User role definition (e.g., "student")
+  preferredSubjects: [       // Array of tracked academic subjects
+    String                   // e.g., "Mathematics", "Science", "History", "Computer Science"
   ],
-  bio: String,               // Short biography (max 500 chars)
-  avatarUrl: String,         // Profile picture URL
-  createdAt: Date,           // Auto-generated timestamp
-  updatedAt: Date            // Auto-updated timestamp
+  bio: String,               // Student biography description
+  avatarUrl: String,         // Profile picture path or URL string
+  name: String,              // User's full name
+  email: String,             // Academic email address (unique)
+  password: String,          // BCrypt-hashed password string
+  createdAt: Date,           // ISO registration timestamp
+  updatedAt: Date,           // ISO profile modification timestamp
+  __v: Number                // MongoDB internal document version key
+}
+```
+
+### Sessions Collection
+```javascript
+{
+  _id: ObjectId,
+  userId: ObjectId,          // Reference to the active User (null if guest/anonymous)
+  subject: String,           // Active subject scope / session channel (e.g., "general")
+  isActive: Boolean,         // Live state flag tracking active connectivity
+  deviceInfo: String,        // Browser user-agent client information string
+  ipAddress: String,         // Operational IPv6 / IPv4 networking string
+  messageCount: Number,      // Metrics aggregation tracking total entries inside session
+  endedAt: Date,             // ISO termination timestamp (null if active)
+  lastActivity: Date,        // ISO timestamp logging most recent user interaction
+  startedAt: Date,           // ISO initialization session timestamp
+  __v: Number                // MongoDB internal document version key
+}
+```
+
+### Messages Collection
+```javascript
+{
+  _id: ObjectId,
+  isUser: Boolean,           // true if message from user, false if AI response
+  sessionId: ObjectId,       // Reference linking message to parent Sessions document
+  userId: ObjectId,          // Reference linking message back to the core Users collection
+  category: String,          // Algorithmic / UI class category designation (e.g., "general")
+  followUps: [               // Array storing dynamic context follow-up options
+    String
+  ],
+  formattedContent: String,  // Rich parsing markdown / LaTeX target strings (null if unprocessed)
+  readAt: Date,              // ISO read verification timestamp (null if unread)
+  text: String,              // Raw input or generated message string
+  createdAt: Date,           // ISO historical message entry timestamp
+  __v: Number                // MongoDB internal document version key
 }
 ```
 
@@ -282,31 +371,18 @@ GET /api/messages?limit=50&page=1
 ```javascript
 {
   _id: ObjectId,
-  subject: String,           // Subject category (math, science, history, general)
-  topic: String,             // Specific topic within the subject
-  content: String,           // Main learning content
-  tags: [String],            // Array of tags for categorization
-  references: [{             // External reference links
+  subject: String,           // Subject category (Mathematics, Science, History, etc.)
+  topic: String,             // Specific topic within the subject scope
+  content: String,           // Main instructional learning content
+  tags: [String],            // Array of tags for search categorization
+  references: [{             // External source reference links
     title: String,           // Reference title
-    url: String              // Reference URL
+    url: String              // Reference target URL
   }],
-  isPublished: Boolean,      // Draft (false) or published (true)
-  createdBy: ObjectId,       // Reference to User who created it
-  createdAt: Date,
-  updatedAt: Date
-}
-```
-
-### Message Collection
-```javascript
-{
-  _id: ObjectId,
-  text: String,              // Message content
-  isUser: Boolean,           // true if from user, false if AI response
-  category: String,          // Detected subject category
-  subject: String,           // User-selected subject filter
-  sentiment: String,         // Detected sentiment (neutral, frustrated, confused)
-  createdAt: Date
+  isPublished: Boolean,      // Draft state representation toggle
+  createdBy: ObjectId,       // Reference back to authoring Administrative / Faculty User
+  createdAt: Date,           // ISO creation timestamp
+  updatedAt: Date            // ISO last-modified configuration timestamp
 }
 ```
 
@@ -399,11 +475,12 @@ Return to Frontend → Display with appropriate formatting
 | Team Member | Docker Installed | Git Installed | VS Code Installed | Can Run Hello World Container |
 |----------------|-------------------|--------------|---------------------|-----------------------------------|
 | Alex            | ✓                           | ✓                  | ✓                               | ✓                                                   |
-| [Name]            |                            |                   |                                |                                                    |
-| [Name]            |                            |                   |                                |                                                    |
-| [Name]            |                             |                   |                                 |                                                   |
+| Christenne            |                            |                   |                                |                                                   |
+| Harty Joy            | ✓                           | ✓                  | ✓                               |  ✓                                                  |
+| Broose            |                             |                   |                                 |                                                   |
 
 ## Docker Version Information
+Docker version 29.4.1, build 055a478
 
 ## Project Architecture Draft
 <img width="1682" height="800" alt="Project Architecture for BrainBytes AI Tutoring Platform" src="https://github.com/user-attachments/assets/97628dd0-5331-4f31-bfa0-58c3cb3a4356" />
