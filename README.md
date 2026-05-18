@@ -476,7 +476,7 @@ Return to Frontend → Display with appropriate formatting
 | Team Member | Docker Installed | Git Installed | VS Code Installed | Can Run Hello World Container |
 |----------------|-------------------|--------------|---------------------|-----------------------------------|
 | Alex            | ✓                           | ✓                  | ✓                               | ✓                                                   |
-| Christenne            |                            |                   |                                |                                                   |
+| Christenne            |            ✓                |     ✓              |       ✓                         |       ✓                                            |
 | Harty Joy            | ✓                           | ✓                  | ✓                               |  ✓                                                  |
 | Broose            |                             |                   |                                 |                                                   |
 
