@@ -1,3 +1,4 @@
+
 # BrainBytes AI Tutoring Platform
 
 ## Project Overview
@@ -483,7 +484,7 @@ Return to Frontend → Display with appropriate formatting
 Docker version 29.4.1, build 055a478
 
 ## Project Architecture Draft
-<img width="1682" height="800" alt="Project Architecture for BrainBytes AI Tutoring Platform" src="https://github.com/user-attachments/assets/97628dd0-5331-4f31-bfa0-58c3cb3a4356" />
+<img width="4013" height="2850" alt="BrainBytes Architecture Diagram" src="https://github.com/user-attachments/assets/c939e60f-9898-4db6-8e14-171451e41c83" />
 
 ## Task Distribution Plan
 https://docs.google.com/spreadsheets/d/1e3JSPDEwzf6VswULflVIxrk0AFxl5QTjwNTdBPtG3K0/edit?usp=sharing
