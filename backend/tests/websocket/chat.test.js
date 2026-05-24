@@ -34,8 +34,11 @@ describe('WebSocket Chat Communication', () => {
   });
 
   afterAll(async () => {
+    // Forcefully close all socket connections
+    const sockets = await io.fetchSockets();
+    sockets.forEach(s => s.disconnect(true));
     io.close();
-    httpServer.close();
+    await new Promise(resolve => httpServer.close(resolve));
     await disconnectFromDatabase();
   });
 
@@ -250,8 +253,7 @@ describe('WebSocket Chat Communication', () => {
       auth: { token: jwt.sign({ id: user2._id }, process.env.JWT_SECRET, { expiresIn: '7d' }) }
     });
 
-    let listenerJoined = false;
-    let disconnectorJoined = false;
+    let testFinished = false;
 
     listener.on('connect', () => {
       listener.emit('session:join', { sessionId: session._id.toString(), userName: 'Listener' });
@@ -264,11 +266,12 @@ describe('WebSocket Chat Communication', () => {
     // user:joined is emitted to everyone EXCEPT the sender
     // So listener will receive it when disconnector joins
     listener.on('user:joined', () => {
-      listenerJoined = true;
       tryDisconnect();
     });
 
     listener.on('user:left', (data) => {
+      if (testFinished) return;
+      testFinished = true;
       expect(data).toBeDefined();
       expect(data.userId).toBe(user2._id.toString());
       listener.close();
@@ -283,6 +286,8 @@ describe('WebSocket Chat Communication', () => {
     }
 
     setTimeout(() => {
+      if (testFinished) return;
+      testFinished = true;
       listener.close();
       disconnector.close();
       done(new Error('Timeout waiting for disconnect notification'));
