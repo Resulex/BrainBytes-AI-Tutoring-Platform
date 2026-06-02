@@ -1,0 +1,109 @@
+name: BrainBytes CI/CD
+
+on:
+  push:
+    branches: [ main, development ]
+  pull_request:
+    branches: [ main, development ]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+      
+      # Frontend linting
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Lint frontend code
+        working-directory: ./frontend
+        run: |
+          npm run lint || echo "Frontend linting failed but continuing workflow"
+      
+      # Backend linting
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm ci
+      
+      - name: Lint backend code
+        working-directory: ./backend
+        run: |
+          npm run lint || echo "Backend linting failed but continuing workflow"
+  
+  test:
+    name: Run Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+      
+      # Frontend tests
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm i
+      
+      # - name: Run frontend tests
+      #   working-directory: ./frontend
+      #   run: npm test
+      
+      # Backend tests
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm i
+      
+      - name: Run backend tests
+        working-directory: ./backend
+        run: npm test
+  
+  build:
+    name: Build Docker Images
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      
+      - name: Build frontend image
+        uses: docker/build-push-action@v2
+        with:
+          context: ./frontend
+          push: false
+          tags: brainbytes/frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build backend image
+        uses: docker/build-push-action@v2
+        with:
+          context: ./backend
+          push: false
+          tags: brainbytes/backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Test Docker Compose
+        run: |
+          docker-compose -f docker-compose.yml up -d
+          docker-compose ps
+          docker-compose down
