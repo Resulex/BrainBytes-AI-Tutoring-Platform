@@ -1,6 +1,9 @@
 
 # BrainBytes AI Tutoring Platform
 
+[![BrainBytes
+CI/CD](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/main.yml/badge.svg)](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/main.yml)
+
 [![CI
 Status](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/ci.yml)
 
