@@ -13,11 +13,11 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # --- FRONTEND ---
       - name: Set up Node.js for Frontend
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: '16'
           cache: 'npm'
@@ -33,7 +33,7 @@ jobs:
 
       # --- BACKEND ---
       - name: Set up Node.js for Backend
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: '16'
           cache: 'npm'
