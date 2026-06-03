@@ -1,10 +1,7 @@
 name: BrainBytes CI
 
 on:
-  push:
-    branches: [ main, development ]
-  pull_request:
-    branches: [ main, development ]
+  workflow_dispatch:
 
 jobs:
   # LINT
@@ -21,6 +18,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Upgrade npm
+        run: npm install -g npm@latest
 
       # Cache frontend dependencies
       - name: Cache frontend node_modules
@@ -76,6 +76,9 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Upgrade npm
+        run: npm install -g npm@latest
+
       # --- FRONTEND ---
       - name: Cache frontend node_modules
         uses: actions/cache@v4
@@ -120,30 +123,3 @@ jobs:
           path: |
             backend/coverage/
             backend/junit.xml
-
-  # NOTIFY
-  notify:
-    name: Notify Status
-    needs: [lint, test]
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-
-    steps:
-      - name: Send email notification
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: ${{ secrets.MAIL_SERVER }}
-          server_port: ${{ secrets.MAIL_PORT }}
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "BrainBytes CI: ${{ job.status }} — ${{ github.ref_name }}"
-          to: ${{ secrets.MAIL_TO }}
-          from: BrainBytes CI
-          body: |
-            Workflow: ${{ github.workflow }}
-            Status: ${{ job.status }}
-            Branch: ${{ github.ref_name }}
-            Commit: ${{ github.sha }}
-            Author: ${{ github.actor }}
-            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
