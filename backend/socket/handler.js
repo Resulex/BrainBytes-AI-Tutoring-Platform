@@ -26,7 +26,9 @@ function setupSocketHandlers(io) {
   });
 
   io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.id}${socket.userId ? ' (user: ' + socket.userId + ')' : ''}`);
+    console.log(
+      `Socket connected: ${socket.id}${socket.userId ? ' (user: ' + socket.userId + ')' : ''}`,
+    );
 
     // --- Session Management ---
     socket.on('session:join', async (data) => {
@@ -39,17 +41,17 @@ function setupSocketHandlers(io) {
         onlineUsers.set(socket.id, {
           userId: socket.userId,
           name: data.userName || 'Anonymous',
-          sessionId
+          sessionId,
         });
 
         // Notify session about user presence
         socket.to(`session:${sessionId}`).emit('user:joined', {
           userId: socket.userId,
-          name: data.userName || 'Anonymous'
+          name: data.userName || 'Anonymous',
         });
 
         // Emit current online count
-        const sessionUsers = [...onlineUsers.values()].filter(u => u.sessionId === sessionId);
+        const sessionUsers = [...onlineUsers.values()].filter((u) => u.sessionId === sessionId);
         io.to(`session:${sessionId}`).emit('user:onlineCount', { count: sessionUsers.length });
       }
     });
@@ -57,7 +59,9 @@ function setupSocketHandlers(io) {
     // --- Chat Messages via Socket ---
     socket.on('chat:message', async (data) => {
       const { text, subject, sessionId } = data;
-      if (!text || !text.trim()) return;
+      if (!text || !text.trim()) {
+        return;
+      }
 
       const actualSessionId = sessionId || socket.currentSessionId;
 
@@ -67,7 +71,7 @@ function setupSocketHandlers(io) {
           text: text.trim(),
           isUser: true,
           sessionId: actualSessionId,
-          userId: socket.userId || null
+          userId: socket.userId || null,
         });
         await userMessage.save();
 
@@ -75,14 +79,14 @@ function setupSocketHandlers(io) {
         if (actualSessionId) {
           await Session.findByIdAndUpdate(actualSessionId, {
             $inc: { messageCount: 1 },
-            lastActivity: Date.now()
+            lastActivity: Date.now(),
           });
         }
 
         // Emit typing indicator (AI is thinking)
         io.to(`session:${actualSessionId}`).emit('chat:typing', {
           userId: 'ai',
-          isTyping: true
+          isTyping: true,
         });
 
         // Gather recent context for AI
@@ -107,7 +111,7 @@ function setupSocketHandlers(io) {
           sessionId: actualSessionId,
           userId: socket.userId || null,
           category: aiResult.category,
-          followUps
+          followUps,
         });
         await aiMessage.save();
 
@@ -115,7 +119,7 @@ function setupSocketHandlers(io) {
         if (actualSessionId) {
           await Session.findByIdAndUpdate(actualSessionId, {
             $inc: { messageCount: 1 },
-            subject: aiResult.category || subject || 'general'
+            subject: aiResult.category || subject || 'general',
           });
         }
 
@@ -124,23 +128,22 @@ function setupSocketHandlers(io) {
           message: aiMessage,
           type: 'ai',
           category: aiResult.category,
-          followUps
+          followUps,
         });
 
         // Stop typing indicator
         io.to(`session:${actualSessionId}`).emit('chat:typing', {
           userId: 'ai',
-          isTyping: false
+          isTyping: false,
         });
-
       } catch (error) {
         console.error('Socket chat:message error:', error);
         io.to(`session:${actualSessionId}`).emit('chat:error', {
-          message: "I'm sorry, I encountered an error processing your request. Please try again."
+          message: "I'm sorry, I encountered an error processing your request. Please try again.",
         });
         io.to(`session:${actualSessionId}`).emit('chat:typing', {
           userId: 'ai',
-          isTyping: false
+          isTyping: false,
         });
       }
     });
@@ -150,7 +153,9 @@ function setupSocketHandlers(io) {
       const { isTyping, sessionId } = data;
       const actualSessionId = sessionId || socket.currentSessionId;
 
-      if (!actualSessionId) return;
+      if (!actualSessionId) {
+        return;
+      }
 
       if (isTyping) {
         if (!typingUsers.has(actualSessionId)) {
@@ -161,32 +166,37 @@ function setupSocketHandlers(io) {
         const sessionTyping = typingUsers.get(actualSessionId);
         if (sessionTyping) {
           sessionTyping.delete(socket.id);
-          if (sessionTyping.size === 0) typingUsers.delete(actualSessionId);
+          if (sessionTyping.size === 0) {
+            typingUsers.delete(actualSessionId);
+          }
         }
       }
 
-      const isAnyTyping = typingUsers.has(actualSessionId) && typingUsers.get(actualSessionId).size > 0;
+      const isAnyTyping =
+        typingUsers.has(actualSessionId) && typingUsers.get(actualSessionId).size > 0;
       socket.to(`session:${actualSessionId}`).emit('chat:typing', {
         userId: socket.userId,
-        isTyping: isAnyTyping
+        isTyping: isAnyTyping,
       });
     });
 
     // --- Read Receipts ---
     socket.on('chat:readReceipt', async (data) => {
       const { messageIds, sessionId } = data;
-      if (!messageIds || !Array.isArray(messageIds)) return;
+      if (!messageIds || !Array.isArray(messageIds)) {
+        return;
+      }
 
       try {
         await Message.updateMany(
           { _id: { $in: messageIds }, readAt: null },
-          { readAt: new Date() }
+          { readAt: new Date() },
         );
 
         socket.to(`session:${sessionId || socket.currentSessionId}`).emit('chat:readReceipt', {
           messageIds,
           readAt: new Date(),
-          userId: socket.userId
+          userId: socket.userId,
         });
       } catch (error) {
         console.error('Read receipt error:', error);
@@ -205,16 +215,18 @@ function setupSocketHandlers(io) {
         const sessionTyping = typingUsers.get(sessionId);
         if (sessionTyping) {
           sessionTyping.delete(socket.id);
-          if (sessionTyping.size === 0) typingUsers.delete(sessionId);
+          if (sessionTyping.size === 0) {
+            typingUsers.delete(sessionId);
+          }
         }
 
         // Notify session
         io.to(`session:${sessionId}`).emit('user:left', {
           userId: socket.userId,
-          name: userInfo.name
+          name: userInfo.name,
         });
 
-        const sessionUsers = [...onlineUsers.values()].filter(u => u.sessionId === sessionId);
+        const sessionUsers = [...onlineUsers.values()].filter((u) => u.sessionId === sessionId);
         io.to(`session:${sessionId}`).emit('user:onlineCount', { count: sessionUsers.length });
       }
     });

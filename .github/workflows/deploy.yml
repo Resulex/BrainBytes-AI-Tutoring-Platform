@@ -1,0 +1,276 @@
+name: Deploy to Test Environment
+
+on:
+  push:
+    branches:
+      - development            # Push to development → deploys to TEST
+      - main                   # Push to main        → deploys to STAGING
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/dependabot.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        default: 'test'
+        options:
+          - test
+          - staging
+      skip-tests:
+        description: 'Skip verification checks'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # ── Determine which environment to deploy to ───────────────────────────────
+  set-environment:
+    name: Set Deployment Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+    steps:
+      - name: Determine target environment
+        id: set-env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "environment=staging" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=test" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Print environment
+        run: echo "Deploying to ${{ steps.set-env.outputs.environment }}"
+
+  # ── Build & Push Docker Images ─────────────────────────────────────────────
+  build-and-push:
+    name: Build & Push (${{ needs.set-environment.outputs.environment }})
+    needs: set-environment
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.set-environment.outputs.environment }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Determine image metadata ──
+      - name: Generate image metadata
+        id: meta
+        run: |
+          GIT_SHA="$(git rev-parse --short HEAD)"
+          echo "sha=${GIT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GIT_SHA}-$(date +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT"
+          echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      # ── Build & Push Backend ──
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.repo }}-backend:${{ steps.meta.outputs.sha }}
+            ghcr.io/${{ steps.meta.outputs.repo }}-backend:latest
+            ghcr.io/${{ steps.meta.outputs.repo }}-backend:${{ needs.set-environment.outputs.environment }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Build & Push Frontend ──
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:3000' }}
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.repo }}-frontend:${{ steps.meta.outputs.sha }}
+            ghcr.io/${{ steps.meta.outputs.repo }}-frontend:latest
+            ghcr.io/${{ steps.meta.outputs.repo }}-frontend:${{ needs.set-environment.outputs.environment }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Deploy to Target Host ──────────────────────────────────────────────────
+  deploy:
+    name: Deploy (${{ needs.set-environment.outputs.environment }})
+    needs: [set-environment, build-and-push]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.set-environment.outputs.environment }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Generate image metadata
+        id: meta
+        run: |
+          echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+
+            # ── Configuration ──
+            DEPLOY_PATH="/opt/brainbytes"
+            REPO="$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+            SHA="${{ steps.meta.outputs.sha }}"
+
+            echo "=== Deploying to ${{ needs.set-environment.outputs.environment }} ==="
+            echo "Image SHA: $SHA"
+            echo "Repository: $REPO"
+
+            cd "$DEPLOY_PATH" || { echo "ERROR: $DEPLOY_PATH not found"; exit 1; }
+
+            # ── Login to GHCR ──
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+              -u "${{ github.repository_owner }}" --password-stdin
+
+            # ── Pull images ──
+            echo "=== Pulling images ==="
+            docker pull "ghcr.io/${REPO}-backend:${{ needs.set-environment.outputs.environment }}"
+            docker pull "ghcr.io/${REPO}-frontend:${{ needs.set-environment.outputs.environment }}"
+
+            # ── Write .env file on remote ──
+            cat > .env << 'DOTENV'
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            HUGGINGFACE_TOKEN=${{ secrets.HUGGINGFACE_TOKEN }}
+            MONGODB_URI=${{ secrets.MONGODB_URI }}
+            NODE_ENV=${{ needs.set-environment.outputs.environment == 'staging' && 'staging' || 'test' }}
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:3000' }}
+            DOTENV
+
+            # ── Restart services ──
+            echo "=== Restarting services ==="
+            if command -v docker compose &>/dev/null; then
+              docker compose down --remove-orphans || true
+              docker compose up -d --wait --wait-timeout 120
+            else
+              docker-compose down --remove-orphans || true
+              docker-compose up -d
+            fi
+
+            # ── Cleanup old images ──
+            echo "=== Pruning unused images ==="
+            docker image prune -af --filter "until=72h" || true
+
+            echo "=== Deployment complete ==="
+
+  # ── Verify Deployment ──────────────────────────────────────────────────────
+  verify:
+    name: Verify (${{ needs.set-environment.outputs.environment }})
+    needs: [set-environment, deploy]
+    if: ${{ !inputs.skip-tests }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.set-environment.outputs.environment }}
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install SSH client
+        run: sudo apt-get update && sudo apt-get install -y openssh-client
+
+      - name: Run composition smoke tests
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -e
+
+          SSH_OPTS="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
+          if [[ -n "$DEPLOY_SSH_KEY" ]]; then
+            echo "$DEPLOY_SSH_KEY" > /tmp/deploy_key
+            chmod 600 /tmp/deploy_key
+            SSH_OPTS="$SSH_OPTS -i /tmp/deploy_key"
+          fi
+
+          echo "=== Running composition verification ==="
+
+          # Copy test script to remote and run it
+          scp $SSH_OPTS ./test-composition.sh "$DEPLOY_USER@$DEPLOY_HOST:/tmp/test-composition.sh"
+          ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" 'bash /tmp/test-composition.sh'
+
+          # Cleanup
+          rm -f /tmp/deploy_key
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Deployment Verification Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Environment | ${{ needs.set-environment.outputs.environment }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Branch | ${{ github.ref_name }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Notify ─────────────────────────────────────────────────────────────────
+  notify:
+    name: Notify (${{ needs.set-environment.outputs.environment }})
+    needs: [set-environment, deploy, verify]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Send deployment notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "[BrainBytes] Deployment to ${{ needs.set-environment.outputs.environment }} — ${{ needs.deploy.result == 'success' && 'SUCCESS' || 'FAILED' }}"
+          to: ${{ secrets.NOTIFY_EMAIL }}
+          from: BrainBytes CI
+          body: |
+            Deployment to **${{ needs.set-environment.outputs.environment }}** has completed.
+
+            | Field        | Value                                    |
+            |-------------|------------------------------------------|
+            | Branch      | `${{ github.ref_name }}`                 |
+            | Commit      | `${{ github.sha }}`                      |
+            | Environment | ${{ needs.set-environment.outputs.environment }} |
+            | Build       | ${{ needs.build-and-push.result }}        |
+            | Deploy      | ${{ needs.deploy.result }}                |
+            | Verify      | ${{ needs.verify.result }}                |
+            | Triggered by| ${{ github.actor }}                      |
+
+            **Workflow URL:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

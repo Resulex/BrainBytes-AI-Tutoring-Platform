@@ -1,6 +1,12 @@
 const request = require('supertest');
 const UserPreference = require('../../models/UserPreference');
-const { createApp, createTestUser, connectToDatabase, disconnectFromDatabase, clearCollections } = require('../setup');
+const {
+  createApp,
+  createTestUser,
+  connectToDatabase,
+  disconnectFromDatabase,
+  clearCollections,
+} = require('../setup');
 
 const app = createApp();
 
@@ -12,9 +18,7 @@ describe('Preferences API — GET /api/preferences', () => {
   test('should return defaults for new user', async () => {
     const { token } = await createTestUser();
 
-    const res = await request(app)
-      .get('/api/preferences')
-      .set('Authorization', `Bearer ${token}`);
+    const res = await request(app).get('/api/preferences').set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(res.body.preferences.theme).toBe('light');
@@ -66,9 +70,7 @@ describe('Preferences API — PUT /api/preferences', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ language: 'fil' });
 
-    const res = await request(app)
-      .get('/api/preferences')
-      .set('Authorization', `Bearer ${token}`);
+    const res = await request(app).get('/api/preferences').set('Authorization', `Bearer ${token}`);
 
     expect(res.body.preferences.language).toBe('fil');
   });

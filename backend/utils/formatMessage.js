@@ -3,7 +3,9 @@
  * Supports: code blocks, inline code, bold, italic, lists, headers
  */
 function formatMessage(text) {
-  if (!text) return { plain: '', html: '', blocks: [] };
+  if (!text) {
+    return { plain: '', html: '', blocks: [] };
+  }
 
   const blocks = [];
   let currentBlock = { type: 'paragraph', content: '' };
@@ -28,7 +30,7 @@ function formatMessage(text) {
       blocks.push({
         type: 'code',
         content: codeContent.join('\n'),
-        language: line.trim().replace('```', '').trim() || 'text'
+        language: line.trim().replace('```', '').trim() || 'text',
       });
       continue;
     }
@@ -60,14 +62,14 @@ function formatMessage(text) {
     }
 
     // List items
-    if (line.trim().match(/^[\-\*]\s/)) {
+    if (line.trim().match(/^[-*]\s/)) {
       if (currentBlock.type !== 'list') {
         if (currentBlock.content.trim()) {
           blocks.push({ ...currentBlock });
         }
         currentBlock = { type: 'list', items: [] };
       }
-      currentBlock.items.push(line.trim().replace(/^[\-\*]\s/, ''));
+      currentBlock.items.push(line.trim().replace(/^[-*]\s/, ''));
       continue;
     }
 
@@ -117,41 +119,48 @@ function formatMessage(text) {
 }
 
 function blocksToHtml(blocks) {
-  return blocks.map(block => {
-    switch (block.type) {
-      case 'h1':
-        return `<h1 style="font-size:1.5em;font-weight:700;margin:12px 0 6px">${escapeHtml(block.content)}</h1>`;
-      case 'h2':
-        return `<h2 style="font-size:1.3em;font-weight:600;margin:10px 0 5px">${escapeHtml(block.content)}</h2>`;
-      case 'h3':
-        return `<h3 style="font-size:1.15em;font-weight:600;margin:8px 0 4px">${escapeHtml(block.content)}</h3>`;
-      case 'code':
-        return `<pre style="background:#1e1e2e;color:#cdd6f4;padding:12px;border-radius:8px;overflow-x:auto;font-size:13px;margin:8px 0"><code>${escapeHtml(block.content)}</code></pre>`;
-      case 'list':
-        return `<ul style="margin:6px 0;padding-left:24px">${block.items.map(item => `<li style="margin:3px 0">${escapeHtml(item)}</li>`).join('')}</ul>`;
-      case 'numbered-list':
-        return `<ol style="margin:6px 0;padding-left:24px">${block.items.map(item => `<li style="margin:3px 0">${escapeHtml(item)}</li>`).join('')}</ol>`;
-      case 'paragraph':
-      default:
-        return `<p style="margin:6px 0;line-height:1.6">${formatInline(escapeHtml(block.content))}</p>`;
-    }
-  }).join('');
+  return blocks
+    .map((block) => {
+      switch (block.type) {
+        case 'h1':
+          return `<h1 style="font-size:1.5em;font-weight:700;margin:12px 0 6px">${escapeHtml(block.content)}</h1>`;
+        case 'h2':
+          return `<h2 style="font-size:1.3em;font-weight:600;margin:10px 0 5px">${escapeHtml(block.content)}</h2>`;
+        case 'h3':
+          return `<h3 style="font-size:1.15em;font-weight:600;margin:8px 0 4px">${escapeHtml(block.content)}</h3>`;
+        case 'code':
+          return `<pre style="background:#1e1e2e;color:#cdd6f4;padding:12px;border-radius:8px;overflow-x:auto;font-size:13px;margin:8px 0"><code>${escapeHtml(block.content)}</code></pre>`;
+        case 'list':
+          return `<ul style="margin:6px 0;padding-left:24px">${block.items.map((item) => `<li style="margin:3px 0">${escapeHtml(item)}</li>`).join('')}</ul>`;
+        case 'numbered-list':
+          return `<ol style="margin:6px 0;padding-left:24px">${block.items.map((item) => `<li style="margin:3px 0">${escapeHtml(item)}</li>`).join('')}</ol>`;
+        case 'paragraph':
+        default:
+          return `<p style="margin:6px 0;line-height:1.6">${formatInline(escapeHtml(block.content))}</p>`;
+      }
+    })
+    .join('');
 }
 
 function blocksToPlain(blocks) {
-  return blocks.map(block => {
-    switch (block.type) {
-      case 'h1': case 'h2': case 'h3':
-        return block.content;
-      case 'code':
-        return block.content;
-      case 'list': case 'numbered-list':
-        return block.items.join('\n');
-      case 'paragraph':
-      default:
-        return block.content;
-    }
-  }).join('\n\n');
+  return blocks
+    .map((block) => {
+      switch (block.type) {
+        case 'h1':
+        case 'h2':
+        case 'h3':
+          return block.content;
+        case 'code':
+          return block.content;
+        case 'list':
+        case 'numbered-list':
+          return block.items.join('\n');
+        case 'paragraph':
+        default:
+          return block.content;
+      }
+    })
+    .join('\n\n');
 }
 
 function formatInline(text) {
@@ -160,7 +169,10 @@ function formatInline(text) {
   // Italic: *text*
   text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
   // Inline code: `text`
-  text = text.replace(/`([^`]+)`/g, '<code style="background:#f0f0f0;padding:2px 5px;border-radius:3px;font-size:0.9em">$1</code>');
+  text = text.replace(
+    /`([^`]+)`/g,
+    '<code style="background:#f0f0f0;padding:2px 5px;border-radius:3px;font-size:0.9em">$1</code>',
+  );
   // Line breaks
   text = text.replace(/\n/g, '<br>');
   return text;

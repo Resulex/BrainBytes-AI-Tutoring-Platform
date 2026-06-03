@@ -1,0 +1,31 @@
+version: '3'
+
+# E2E testing override - extends docker-compose.yml for test environments
+services:
+  frontend:
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:3000
+    ports:
+      - "8080:3000"
+
+  backend:
+    environment:
+      - NODE_ENV=test
+      - JWT_SECRET=brainbytes-e2e-test-secret
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+
+  e2e-tests:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.e2e
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    environment:
+      - BASE_URL=http://frontend:3000
+      - BACKEND_URL=http://backend:3000
+    volumes:
+      - ./frontend/e2e:/usr/src/app/e2e
+      - ./frontend/playwright-report:/usr/src/app/playwright-report

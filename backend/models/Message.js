@@ -4,43 +4,43 @@ const messageSchema = new mongoose.Schema({
   text: {
     type: String,
     required: [true, 'Message text is required'],
-    trim: true
+    trim: true,
   },
   isUser: {
     type: Boolean,
-    default: true
+    default: true,
   },
   sessionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Session',
-    default: null
+    default: null,
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    default: null
+    default: null,
   },
   category: {
     type: String,
     enum: ['math', 'science', 'history', 'general', 'error'],
-    default: 'general'
+    default: 'general',
   },
   followUps: {
     type: [String],
-    default: []
+    default: [],
   },
   formattedContent: {
     type: mongoose.Schema.Types.Mixed,
-    default: null
+    default: null,
   },
   readAt: {
     type: Date,
-    default: null
+    default: null,
   },
   createdAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
 // Indexes for common queries

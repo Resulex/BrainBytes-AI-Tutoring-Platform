@@ -4,48 +4,48 @@ const sessionSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    default: null
+    default: null,
   },
   subject: {
     type: String,
     enum: ['math', 'science', 'history', 'general', ''],
-    default: ''
+    default: '',
   },
   isActive: {
     type: Boolean,
-    default: true
+    default: true,
   },
   deviceInfo: {
     type: String,
-    default: ''
+    default: '',
   },
   ipAddress: {
     type: String,
-    default: ''
+    default: '',
   },
   lastActivity: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   messageCount: {
     type: Number,
-    default: 0
+    default: 0,
   },
   startedAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   endedAt: {
     type: Date,
-    default: null
-  }
+    default: null,
+  },
 });
 
 sessionSchema.index({ userId: 1, lastActivity: -1 });
 sessionSchema.index({ isActive: 1, lastActivity: 1 });
 
 // Update lastActivity on save
-sessionSchema.pre('save', function(next) {
+sessionSchema.pre('save', function (next) {
   this.lastActivity = Date.now();
   next();
 });

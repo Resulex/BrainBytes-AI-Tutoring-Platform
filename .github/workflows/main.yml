@@ -7,106 +7,452 @@ on:
     branches: [ main, development ]
   workflow_dispatch:
 
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
 jobs:
-  lint:
-    name: Lint Code
+  # CODE QUALITY (lint + format + audit + secrets + large files)
+  code-quality:
+    name: Code Quality Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
-      
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/checkout@v4
         with:
-          node-version: '16'
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-      
-      # Frontend linting
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      # ── Cache & Install Frontend ──
+      - name: Cache frontend node_modules
+        uses: actions/cache@v4
+        id: cache-frontend-quality
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-frontend-${{ hashFiles('frontend/package-lock.json') }}
+
       - name: Install frontend dependencies
+        if: steps.cache-frontend-quality.outputs.cache-hit != 'true'
         working-directory: ./frontend
-        run: npm i
-      
-      - name: Lint frontend code
-        working-directory: ./frontend
-        run: |
-          npm run lint || echo "Frontend linting failed but continuing workflow"
-      
-      # Backend linting
+        run: npm ci --prefer-offline
+
+      # ── Cache & Install Backend ──
+      - name: Cache backend node_modules
+        uses: actions/cache@v4
+        id: cache-backend-quality
+        with:
+          path: backend/node_modules
+          key: ${{ runner.os }}-backend-${{ hashFiles('backend/package-lock.json') }}
+
       - name: Install backend dependencies
+        if: steps.cache-backend-quality.outputs.cache-hit != 'true'
         working-directory: ./backend
-        run: npm i
-      
-      - name: Lint backend code
+        run: npm ci --prefer-offline
+
+      # ── ESLint ──
+      - name: Lint frontend (ESLint)
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Lint backend (ESLint)
         working-directory: ./backend
+        run: npm run lint
+
+      # ── Prettier Format Check ──
+      - name: Check frontend formatting (Prettier)
+        working-directory: ./frontend
+        run: npm run format:check
+
+      - name: Check backend formatting (Prettier)
+        working-directory: ./backend
+        run: npm run format:check
+
+      # ── Dependency Vulnerability Audit ──
+      - name: Audit frontend dependencies
+        working-directory: ./frontend
+        run: npm run audit
+
+      - name: Audit backend dependencies
+        working-directory: ./backend
+        run: npm run audit
+
+      # ── Secret Scanning (Gitleaks) ──
+      - name: Scan for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+      # ── Large File Check ──
+      - name: Check for large files (>5MB)
         run: |
-          npm run lint || echo "Backend linting failed but continuing workflow"
-  
+          echo "Checking for files larger than 5MB..."
+          LARGE_FILES=$(find . -type f \
+            -not -path './.git/*' \
+            -not -path '*/node_modules/*' \
+            -not -path '*/.next/*' \
+            -not -path '*/coverage/*' \
+            -not -name '*.png' \
+            -not -name '*.jpg' \
+            -not -name '*.jpeg' \
+            -not -name '*.gif' \
+            -not -name '*.ico' \
+            -not -name '*.svg' \
+            -not -name '*.ttf' \
+            -not -name '*.woff' \
+            -not -name '*.woff2' \
+            -not -name '*.eot' \
+            -not -name 'package-lock.json' \
+            -size +5M \
+            -exec ls -lh {} \;)
+          if [ -n "$LARGE_FILES" ]; then
+            echo "::error::Large files detected (over 5MB):"
+            echo "$LARGE_FILES"
+            echo "Please use Git LFS or reduce file sizes."
+            exit 1
+          else
+            echo "No large files detected."
+          fi
+
+  # UNIT TESTS WITH COVERAGE (matrix across Node versions)
   test:
-    name: Run Tests
-    needs: lint
+    name: Test (Node ${{ matrix.node-version }})
+    needs: code-quality
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [16, 18, 20]
+
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
-      
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
         with:
-          node-version: '16'
-          cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
-          
-      
-      # Frontend tests
+          node-version: ${{ matrix.node-version }}
+
+      # ── Frontend Tests ──
+      - name: Cache frontend node_modules
+        uses: actions/cache@v4
+        id: cache-frontend-test
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-frontend-${{ matrix.node-version }}-${{ hashFiles('frontend/package-lock.json') }}
+
       - name: Install frontend dependencies
+        if: steps.cache-frontend-test.outputs.cache-hit != 'true'
         working-directory: ./frontend
-        run: npm i
-      
-      # - name: Run frontend tests
-      #   working-directory: ./frontend
-      #   run: npm test
-      
-      # Backend tests
+        run: npm ci --prefer-offline
+
+      - name: Run frontend tests with coverage
+        working-directory: ./frontend
+        run: npm run test:ci
+        continue-on-error: true
+
+      # ── Backend Tests ──
+      - name: Cache backend node_modules
+        uses: actions/cache@v4
+        id: cache-backend-test
+        with:
+          path: backend/node_modules
+          key: ${{ runner.os }}-backend-${{ matrix.node-version }}-${{ hashFiles('backend/package-lock.json') }}
+
       - name: Install backend dependencies
+        if: steps.cache-backend-test.outputs.cache-hit != 'true'
         working-directory: ./backend
-        run: npm i
-      
-      - name: Run backend tests
+        run: npm ci --prefer-offline
+
+      - name: Run backend tests with coverage
         working-directory: ./backend
-        run: npm test
-  
+        run: npm run test:ci
+
+      # ── Upload Coverage Artifacts ──
+      - name: Upload backend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-backend-node-${{ matrix.node-version }}
+          path: |
+            backend/coverage/
+          retention-days: 7
+
+      - name: Upload frontend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-frontend-node-${{ matrix.node-version }}
+          path: |
+            frontend/coverage/
+          retention-days: 7
+
+  # E2E TESTS (Playwright)
+  e2e:
+    name: E2E Tests (Playwright)
+    needs: code-quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache frontend node_modules
+        uses: actions/cache@v4
+        id: cache-frontend-e2e
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-frontend-e2e-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install frontend dependencies
+        if: steps.cache-frontend-e2e.outputs.cache-hit != 'true'
+        working-directory: ./frontend
+        run: npm ci --prefer-offline
+
+      - name: Install Playwright browsers
+        working-directory: ./frontend
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Start services with Docker Compose
+        run: |
+          docker compose -f docker-compose.yml up -d --build
+          echo "Waiting for services to become healthy..."
+          sleep 20
+          docker compose ps
+
+      - name: Run Playwright E2E tests
+        working-directory: ./frontend
+        run: npx playwright test --reporter=html,json,junit
+        env:
+          BASE_URL: http://localhost:8080
+          BACKEND_URL: http://localhost:3000
+        continue-on-error: true
+
+      - name: Stop Docker Compose
+        if: always()
+        run: docker compose down -v
+
+      - name: Upload E2E test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
+
+      - name: Upload E2E screenshots (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: frontend/test-results/**/*.png
+          retention-days: 7
+
+  # PERFORMANCE TESTS (k6)
+  performance:
+    name: Performance Tests (k6)
+    needs: code-quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: '0.49.0'
+
+      - name: Verify k6 installation
+        run: k6 version
+
+      - name: Start services with Docker Compose
+        run: |
+          docker compose -f docker-compose.yml up -d --build
+          echo "Waiting for services to become healthy..."
+          sleep 20
+          docker compose ps
+
+      - name: Run k6 performance tests
+        run: k6 run backend/tests/performance/api-load-test.js --summary-export=backend/tests/performance/summary.json
+        env:
+          BASE_URL: http://localhost:3000
+        continue-on-error: true
+
+      - name: Stop Docker Compose
+        if: always()
+        run: docker compose down -v
+
+      - name: Upload performance test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-test-results
+          path: |
+            backend/tests/performance/summary.json
+          retention-days: 7
+
+  # BUILD DOCKER IMAGES
   build:
     name: Build Docker Images
-    needs: test
+    needs: [test, e2e, performance]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
       - name: Check out repository
-        uses: actions/checkout@v2
-      
+        uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
+
       - name: Build frontend image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v5
         with:
           context: ./frontend
           push: false
           tags: brainbytes/frontend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
       - name: Build backend image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v5
         with:
           context: ./backend
           push: false
           tags: brainbytes/backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      
-      - name: Test Docker Compose
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Test Docker Compose composition
         run: |
           docker compose -f docker-compose.yml up -d
+          sleep 15
           docker compose ps
+          bash test-composition.sh || echo "::warning::Composition test had issues"
           docker compose down
+
+  # TEST SUMMARY REPORT
+  report:
+    name: Generate Test Summary
+    needs: [test, e2e, performance]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Download all artifacts from previous jobs
+      - name: Download backend coverage (Node 20)
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-backend-node-20
+          path: backend/coverage/
+        continue-on-error: true
+
+      - name: Download frontend coverage (Node 20)
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-frontend-node-20
+          path: frontend/coverage/
+        continue-on-error: true
+
+      - name: Download E2E report
+        uses: actions/download-artifact@v4
+        with:
+          name: e2e-playwright-report
+          path: frontend/playwright-report/
+        continue-on-error: true
+
+      - name: Download performance results
+        uses: actions/download-artifact@v4
+        with:
+          name: performance-test-results
+          path: backend/tests/performance/
+        continue-on-error: true
+
+      - name: Generate test summary report
+        run: node scripts/generate-summary.js
+
+      - name: Upload test summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-summary-report
+          path: |
+            test-results/summary.md
+            test-results/summary.json
+          retention-days: 30
+
+      # ── PR Comment with Summary (only on PRs) ──
+      - name: Find existing PR comment
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: 'BrainBytes Test Summary'
+
+      - name: Post/Update PR comment with test summary
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: test-results/summary.md
+          edit-mode: replace
+
+  # NOTIFY
+  notify:
+    name: Notify Status
+    needs: [code-quality, test, e2e, performance, build, report]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Send email notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "BrainBytes CI/CD: ${{ job.status }} — ${{ github.ref_name }}"
+          to: ${{ secrets.MAIL_TO }}
+          from: ${{ secrets.MAIL_FROM }}
+          body: |
+            Workflow: ${{ github.workflow }}
+            Status: ${{ job.status }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+

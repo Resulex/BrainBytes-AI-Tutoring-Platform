@@ -5,7 +5,12 @@ const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const Message = require('../../models/Message');
 const Session = require('../../models/Session');
-const { createTestUser, connectToDatabase, disconnectFromDatabase, clearCollections } = require('../setup');
+const {
+  createTestUser,
+  connectToDatabase,
+  disconnectFromDatabase,
+  clearCollections,
+} = require('../setup');
 const { setupSocketHandlers } = require('../../socket/handler');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'brainbytes-dev-secret-key-change-in-production';
@@ -16,11 +21,11 @@ describe('WebSocket Chat Communication', () => {
 
   beforeAll(async () => {
     await connectToDatabase();
-    
+
     httpServer = http.createServer();
     io = new Server(httpServer, { cors: { origin: '*' } });
     setupSocketHandlers(io);
-    await new Promise(resolve => httpServer.listen(0, resolve));
+    await new Promise((resolve) => httpServer.listen(0, resolve));
     port = httpServer.address().port;
 
     // Create test users
@@ -36,9 +41,9 @@ describe('WebSocket Chat Communication', () => {
   afterAll(async () => {
     // Forcefully close all socket connections
     const sockets = await io.fetchSockets();
-    sockets.forEach(s => s.disconnect(true));
+    sockets.forEach((s) => s.disconnect(true));
     io.close();
-    await new Promise(resolve => httpServer.close(resolve));
+    await new Promise((resolve) => httpServer.close(resolve));
     await disconnectFromDatabase();
   });
 
@@ -46,7 +51,7 @@ describe('WebSocket Chat Communication', () => {
 
   test('should connect a client with auth token', (done) => {
     const client = ioc(`http://localhost:${port}`, {
-      auth: { token: token1 }
+      auth: { token: token1 },
     });
 
     client.on('connect', () => {
@@ -72,13 +77,13 @@ describe('WebSocket Chat Communication', () => {
 
   test('should join a session room and receive online count', (done) => {
     const client = ioc(`http://localhost:${port}`, {
-      auth: { token: token1 }
+      auth: { token: token1 },
     });
 
     client.on('connect', () => {
       client.emit('session:join', {
         sessionId: session._id.toString(),
-        userName: 'TestUser'
+        userName: 'TestUser',
       });
     });
 
@@ -91,12 +96,12 @@ describe('WebSocket Chat Communication', () => {
 
   test('should send a message and receive AI response', (done) => {
     const client = ioc(`http://localhost:${port}`, {
-      auth: { token: token1 }
+      auth: { token: token1 },
     });
 
     client.on('connect', () => {
       client.emit('session:join', {
-        sessionId: session._id.toString()
+        sessionId: session._id.toString(),
       });
 
       // Wait a moment for room join, then send message
@@ -104,7 +109,7 @@ describe('WebSocket Chat Communication', () => {
         client.emit('chat:message', {
           sessionId: session._id.toString(),
           text: 'What is 1+1?',
-          subject: 'math'
+          subject: 'math',
         });
       }, 200);
     });
@@ -132,19 +137,19 @@ describe('WebSocket Chat Communication', () => {
 
   test('should save messages to database via socket', (done) => {
     const client = ioc(`http://localhost:${port}`, {
-      auth: { token: token1 }
+      auth: { token: token1 },
     });
 
     client.on('connect', () => {
       client.emit('session:join', {
-        sessionId: session._id.toString()
+        sessionId: session._id.toString(),
       });
 
       setTimeout(() => {
         client.emit('chat:message', {
           sessionId: session._id.toString(),
           text: 'What is photosynthesis?',
-          subject: 'science'
+          subject: 'science',
         });
       }, 200);
     });
@@ -161,7 +166,7 @@ describe('WebSocket Chat Communication', () => {
         const messages = await Message.find({ sessionId: session._id });
         expect(messages.length).toBeGreaterThanOrEqual(2); // user msg + AI response
 
-        const userMsg = messages.find(m => m.isUser === true);
+        const userMsg = messages.find((m) => m.isUser === true);
         expect(userMsg).toBeDefined();
         expect(userMsg.text).toBe('What is photosynthesis?');
 
@@ -174,7 +179,7 @@ describe('WebSocket Chat Communication', () => {
   test('should handle typing indicators', (done) => {
     const client1 = ioc(`http://localhost:${port}`, { auth: { token: token1 } });
     const client2 = ioc(`http://localhost:${port}`, {
-      auth: { token: jwt.sign({ id: user2._id }, JWT_SECRET, { expiresIn: '7d' }) }
+      auth: { token: jwt.sign({ id: user2._id }, JWT_SECRET, { expiresIn: '7d' }) },
     });
 
     let client2Ready = false;
@@ -183,7 +188,7 @@ describe('WebSocket Chat Communication', () => {
     client2.on('connect', () => {
       client2.emit('session:join', {
         sessionId: session._id.toString(),
-        userName: 'User2'
+        userName: 'User2',
       });
       client2Ready = true;
       tryTyping();
@@ -193,7 +198,7 @@ describe('WebSocket Chat Communication', () => {
       if (client1Done) return;
       client1.emit('chat:typing', {
         sessionId: session._id.toString(),
-        isTyping: true
+        isTyping: true,
       });
     };
 
@@ -228,12 +233,12 @@ describe('WebSocket Chat Communication', () => {
         text: 'Test read receipt',
         isUser: false,
         sessionId: session._id,
-        userId: user1._id
+        userId: user1._id,
       });
 
       client.emit('chat:readReceipt', {
         messageIds: [msg._id.toString()],
-        sessionId: session._id.toString()
+        sessionId: session._id.toString(),
       });
 
       // Check DB after sending receipt
@@ -250,7 +255,7 @@ describe('WebSocket Chat Communication', () => {
   test('should notify when a user disconnects', (done) => {
     const listener = ioc(`http://localhost:${port}`, { auth: { token: token1 } });
     const disconnector = ioc(`http://localhost:${port}`, {
-      auth: { token: jwt.sign({ id: user2._id }, process.env.JWT_SECRET, { expiresIn: '7d' }) }
+      auth: { token: jwt.sign({ id: user2._id }, process.env.JWT_SECRET, { expiresIn: '7d' }) },
     });
 
     let testFinished = false;
@@ -260,7 +265,10 @@ describe('WebSocket Chat Communication', () => {
     });
 
     disconnector.on('connect', () => {
-      disconnector.emit('session:join', { sessionId: session._id.toString(), userName: 'Disconnector' });
+      disconnector.emit('session:join', {
+        sessionId: session._id.toString(),
+        userName: 'Disconnector',
+      });
     });
 
     // user:joined is emitted to everyone EXCEPT the sender
@@ -299,20 +307,20 @@ describe('WebSocket Chat Communication', () => {
 
     client.on('connect', () => {
       client.emit('session:join', {
-        sessionId: session._id.toString()
+        sessionId: session._id.toString(),
       });
 
       // Send empty message — should not save or crash
       client.emit('chat:message', {
         sessionId: session._id.toString(),
         text: '   ',
-        subject: 'math'
+        subject: 'math',
       });
 
       // Wait a moment then check DB — should be no new messages
       setTimeout(async () => {
         const messages = await Message.find({ sessionId: session._id });
-        const emptyMsgs = messages.filter(m => m.text.trim() === '');
+        const emptyMsgs = messages.filter((m) => m.text.trim() === '');
         expect(emptyMsgs.length).toBe(0);
         client.close();
         done();

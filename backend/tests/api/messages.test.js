@@ -1,6 +1,12 @@
 const request = require('supertest');
 const Message = require('../../models/Message');
-const { createApp, createTestUser, connectToDatabase, disconnectFromDatabase, clearCollections } = require('../setup');
+const {
+  createApp,
+  createTestUser,
+  connectToDatabase,
+  disconnectFromDatabase,
+  clearCollections,
+} = require('../setup');
 
 const app = createApp();
 
@@ -16,9 +22,7 @@ describe('Messages API — GET /api/messages', () => {
     await Message.create({ text: 'User1 message', isUser: true, userId: user1._id });
     await Message.create({ text: 'User2 message', isUser: true, userId: user2._id });
 
-    const res = await request(app)
-      .get('/api/messages')
-      .set('Authorization', `Bearer ${token1}`);
+    const res = await request(app).get('/api/messages').set('Authorization', `Bearer ${token1}`);
 
     expect(res.status).toBe(200);
     expect(res.body.messages.length).toBe(1);
@@ -68,8 +72,18 @@ describe('Messages API — GET /api/messages', () => {
     const sessionId1 = '507f1f77bcf86cd799439011';
     const sessionId2 = '507f1f77bcf86cd799439012';
 
-    await Message.create({ text: 'Session1 msg', isUser: true, userId: user._id, sessionId: sessionId1 });
-    await Message.create({ text: 'Session2 msg', isUser: true, userId: user._id, sessionId: sessionId2 });
+    await Message.create({
+      text: 'Session1 msg',
+      isUser: true,
+      userId: user._id,
+      sessionId: sessionId1,
+    });
+    await Message.create({
+      text: 'Session2 msg',
+      isUser: true,
+      userId: user._id,
+      sessionId: sessionId2,
+    });
 
     const res = await request(app)
       .get(`/api/messages?sessionId=${sessionId1}`)

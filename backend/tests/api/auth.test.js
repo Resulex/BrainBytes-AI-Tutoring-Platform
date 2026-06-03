@@ -1,5 +1,11 @@
 const request = require('supertest');
-const { createApp, createTestUser, connectToDatabase, disconnectFromDatabase, clearCollections } = require('../setup');
+const {
+  createApp,
+  createTestUser,
+  connectToDatabase,
+  disconnectFromDatabase,
+  clearCollections,
+} = require('../setup');
 
 const app = createApp();
 
@@ -32,9 +38,7 @@ describe('Auth API — POST /api/auth/register', () => {
   });
 
   test('should reject missing required fields', async () => {
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({ name: 'No Email' });
+    const res = await request(app).post('/api/auth/register').send({ name: 'No Email' });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
@@ -103,9 +107,7 @@ describe('Auth API — GET /api/auth/me', () => {
   test('should return current user with valid token', async () => {
     const { token } = await createTestUser();
 
-    const res = await request(app)
-      .get('/api/auth/me')
-      .set('Authorization', `Bearer ${token}`);
+    const res = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(res.body.user).toBeDefined();

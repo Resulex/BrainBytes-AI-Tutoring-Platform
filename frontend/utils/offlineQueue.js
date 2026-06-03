@@ -9,7 +9,7 @@ export function addToQueue(message) {
     queue.push({
       ...message,
       _queuedAt: Date.now(),
-      _retryCount: 0
+      _retryCount: 0,
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
   } catch (err) {
@@ -34,7 +34,7 @@ export function getQueue() {
  */
 export function removeFromQueue(id) {
   try {
-    const queue = getQueue().filter(msg => msg._id !== id);
+    const queue = getQueue().filter((msg) => msg._id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
   } catch (err) {
     console.error('Failed to remove from offline queue:', err);
@@ -61,7 +61,9 @@ export function clearQueue() {
  */
 export async function retryQueue(sendFn, { maxRetries = 5 } = {}) {
   const queue = getQueue();
-  if (queue.length === 0) return 0;
+  if (queue.length === 0) {
+    return 0;
+  }
 
   let sent = 0;
 
@@ -73,7 +75,7 @@ export async function retryQueue(sendFn, { maxRetries = 5 } = {}) {
 
     // Exponential backoff: 1s, 2s, 4s, 8s, 16s
     const delay = Math.min(1000 * Math.pow(2, msg._retryCount), 16000);
-    await new Promise(resolve => setTimeout(resolve, delay));
+    await new Promise((resolve) => setTimeout(resolve, delay));
 
     try {
       const success = await sendFn(msg);
@@ -83,16 +85,12 @@ export async function retryQueue(sendFn, { maxRetries = 5 } = {}) {
       } else {
         // Update retry count
         msg._retryCount++;
-        const updatedQueue = getQueue().map(m =>
-          m._id === msg._id ? msg : m
-        );
+        const updatedQueue = getQueue().map((m) => (m._id === msg._id ? msg : m));
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedQueue));
       }
     } catch {
       msg._retryCount++;
-      const updatedQueue = getQueue().map(m =>
-        m._id === msg._id ? msg : m
-      );
+      const updatedQueue = getQueue().map((m) => (m._id === msg._id ? msg : m));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedQueue));
     }
   }
