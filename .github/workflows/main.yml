@@ -435,7 +435,7 @@ jobs:
   notify:
     name: Notify Status
     needs: [code-quality, test, e2e, performance, build, report]
-    if: always()
+    if: always() && secrets.MAIL_TO != ''
     runs-on: ubuntu-latest
     timeout-minutes: 2
 
