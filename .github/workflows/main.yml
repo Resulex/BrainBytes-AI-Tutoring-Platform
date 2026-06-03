@@ -33,9 +33,6 @@ jobs:
             frontend/package-lock.json
             backend/package-lock.json
 
-      - name: Upgrade npm
-        run: npm install -g npm@latest
-
       # ── Cache & Install Frontend ──
       - name: Cache frontend node_modules
         uses: actions/cache@v4
@@ -149,9 +146,6 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Upgrade npm
-        run: npm install -g npm@latest
-
       # ── Frontend Tests ──
       - name: Cache frontend node_modules
         uses: actions/cache@v4
@@ -221,9 +215,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Upgrade npm
-        run: npm install -g npm@latest
 
       - name: Cache frontend node_modules
         uses: actions/cache@v4

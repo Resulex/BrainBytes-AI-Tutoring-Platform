@@ -39,10 +39,10 @@ function parseCoverage(data) {
   if (!data || !data.total) return null;
   const t = data.total;
   return {
-    lines: t.lines?.pct != null ? `${t.lines.pct.toFixed(1)}%` : 'N/A',
-    branches: t.branches?.pct != null ? `${t.branches.pct.toFixed(1)}%` : 'N/A',
-    functions: t.functions?.pct != null ? `${t.functions.pct.toFixed(1)}%` : 'N/A',
-    statements: t.statements?.pct != null ? `${t.statements.pct.toFixed(1)}%` : 'N/A',
+    lines: typeof t.lines?.pct === 'number' ? `${t.lines.pct.toFixed(1)}%` : 'N/A',
+    branches: typeof t.branches?.pct === 'number' ? `${t.branches.pct.toFixed(1)}%` : 'N/A',
+    functions: typeof t.functions?.pct === 'number' ? `${t.functions.pct.toFixed(1)}%` : 'N/A',
+    statements: typeof t.statements?.pct === 'number' ? `${t.statements.pct.toFixed(1)}%` : 'N/A',
   };
 }
 
