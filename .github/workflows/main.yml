@@ -447,7 +447,7 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: "BrainBytes CI/CD: ${{ job.status }} — ${{ github.ref_name }}"
           to: ${{ secrets.MAIL_TO }}
-          from: ${{ secrets.MAIL_FROM }}
+          from: BrainBytes CI
           body: |
             Workflow: ${{ github.workflow }}
             Status: ${{ job.status }}
