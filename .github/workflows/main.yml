@@ -435,12 +435,13 @@ jobs:
   notify:
     name: Notify Status
     needs: [code-quality, test, e2e, performance, build, report]
-    if: ${{ always() && secrets.MAIL_TO != '' }}
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
 
     steps:
       - name: Send email notification
+        if: ${{ secrets.MAIL_TO != '' }}
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.MAIL_SERVER }}

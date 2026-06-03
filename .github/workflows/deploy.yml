@@ -118,7 +118,6 @@ jobs:
   deploy:
     name: Deploy (${{ needs.set-environment.outputs.environment }})
     needs: [set-environment, build-and-push]
-    if: ${{ secrets.DEPLOY_HOST != '' }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ needs.set-environment.outputs.environment }}
@@ -135,6 +134,7 @@ jobs:
           echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Deploy via SSH
+        if: ${{ secrets.DEPLOY_HOST != '' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -194,7 +194,7 @@ jobs:
   verify:
     name: Verify (${{ needs.set-environment.outputs.environment }})
     needs: [set-environment, deploy]
-    if: ${{ !inputs.skip-tests && secrets.DEPLOY_HOST != '' }}
+    if: ${{ !inputs.skip-tests }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ needs.set-environment.outputs.environment }}
@@ -208,6 +208,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y openssh-client
 
       - name: Run composition smoke tests
+        if: ${{ secrets.DEPLOY_HOST != '' }}
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
@@ -246,12 +247,13 @@ jobs:
   notify:
     name: Notify (${{ needs.set-environment.outputs.environment }})
     needs: [set-environment, deploy, verify]
-    if: ${{ always() && secrets.NOTIFY_EMAIL != '' }}
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
 
     steps:
       - name: Send deployment notification
+        if: ${{ secrets.NOTIFY_EMAIL != '' }}
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
