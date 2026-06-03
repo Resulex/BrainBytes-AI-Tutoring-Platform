@@ -438,10 +438,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    env:
+      MAIL_TO: ${{ secrets.MAIL_TO }}
 
     steps:
       - name: Send email notification
-        if: ${{ secrets.MAIL_TO != '' }}
+        if: env.MAIL_TO != ''
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
