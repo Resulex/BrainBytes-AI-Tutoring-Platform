@@ -8,7 +8,7 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "UTC"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 2
     labels:
       - "dependencies"
       - "backend"
@@ -19,6 +19,10 @@ updates:
       prefix: "chore(deps)"
       prefix-development: "chore(deps-dev)"
       include: "scope"
+    groups:
+      all-dependencies:
+        patterns:
+          - "*"
 
   # npm dependencies — frontend
   - package-ecosystem: "npm"
@@ -28,7 +32,7 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "UTC"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 2
     labels:
       - "dependencies"
       - "frontend"
@@ -39,6 +43,10 @@ updates:
       prefix: "chore(deps)"
       prefix-development: "chore(deps-dev)"
       include: "scope"
+    groups:
+      all-dependencies:
+        patterns:
+          - "*"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -54,6 +62,10 @@ updates:
     commit-message:
       prefix: "chore(ci)"
       include: "scope"
+    groups:
+      all-actions:
+        patterns:
+          - "*"
 
   # Docker images — backend
   - package-ecosystem: "docker"
@@ -69,6 +81,10 @@ updates:
     commit-message:
       prefix: "chore(docker)"
       include: "scope"
+    groups:
+      all-docker:
+        patterns:
+          - "*"
 
   # Docker images — frontend
   - package-ecosystem: "docker"
@@ -84,3 +100,7 @@ updates:
     commit-message:
       prefix: "chore(docker)"
       include: "scope"
+    groups:
+      all-docker:
+        patterns:
+          - "*"
