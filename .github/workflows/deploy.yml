@@ -118,7 +118,7 @@ jobs:
   deploy:
     name: Deploy (${{ needs.set-environment.outputs.environment }})
     needs: [set-environment, build-and-push]
-    if: secrets.DEPLOY_HOST != ''
+    if: ${{ secrets.DEPLOY_HOST != '' }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ needs.set-environment.outputs.environment }}
@@ -246,7 +246,7 @@ jobs:
   notify:
     name: Notify (${{ needs.set-environment.outputs.environment }})
     needs: [set-environment, deploy, verify]
-    if: always() && secrets.NOTIFY_EMAIL != ''
+    if: ${{ always() && secrets.NOTIFY_EMAIL != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
 
