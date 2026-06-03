@@ -1,5 +1,11 @@
 const request = require('supertest');
-const { createApp, createTestUser, connectToDatabase, disconnectFromDatabase, clearCollections } = require('./setup');
+const {
+  createApp,
+  createTestUser,
+  connectToDatabase,
+  disconnectFromDatabase,
+  clearCollections,
+} = require('./setup');
 
 const app = createApp();
 
@@ -45,9 +51,7 @@ describe('Error Scenarios', () => {
     });
 
     test('400 — should validate required fields on registration', async () => {
-      const res = await request(app)
-        .post('/api/auth/register')
-        .send({ name: 'No Password' });
+      const res = await request(app).post('/api/auth/register').send({ name: 'No Password' });
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBeDefined();
@@ -128,7 +132,7 @@ describe('Error Scenarios', () => {
       const res = await request(app).get('/api/users');
 
       expect(res.status).toBe(200);
-      res.body.forEach(user => {
+      res.body.forEach((user) => {
         expect(user).not.toHaveProperty('password');
       });
     });

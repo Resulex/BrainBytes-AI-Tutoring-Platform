@@ -1,7 +1,13 @@
 const request = require('supertest');
 const Session = require('../../models/Session');
 const Message = require('../../models/Message');
-const { createApp, createTestUser, connectToDatabase, disconnectFromDatabase, clearCollections } = require('../setup');
+const {
+  createApp,
+  createTestUser,
+  connectToDatabase,
+  disconnectFromDatabase,
+  clearCollections,
+} = require('../setup');
 
 const app = createApp();
 
@@ -25,9 +31,7 @@ describe('Sessions API — POST /api/sessions', () => {
   });
 
   test('should create session without auth (optionalAuth)', async () => {
-    const res = await request(app)
-      .post('/api/sessions')
-      .send({ subject: 'science' });
+    const res = await request(app).post('/api/sessions').send({ subject: 'science' });
 
     expect(res.status).toBe(201);
     expect(res.body.session).toBeDefined();
@@ -41,9 +45,7 @@ describe('Sessions API — GET /api/sessions', () => {
     await Session.create({ userId: user._id, subject: 'science' });
     await Session.create({ userId: user._id, subject: 'history' });
 
-    const res = await request(app)
-      .get('/api/sessions')
-      .set('Authorization', `Bearer ${token}`);
+    const res = await request(app).get('/api/sessions').set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(res.body.sessions.length).toBe(2);
@@ -125,9 +127,7 @@ describe('Sessions API — PUT /api/sessions/:id', () => {
     const { user } = await createTestUser();
     const session = await Session.create({ userId: user._id });
 
-    const res = await request(app)
-      .put(`/api/sessions/${session._id}`)
-      .send({ subject: 'science' });
+    const res = await request(app).put(`/api/sessions/${session._id}`).send({ subject: 'science' });
 
     expect(res.status).toBe(401);
   });

@@ -6,8 +6,8 @@ const { authenticate } = require('../middleware/auth');
 // GET /api/preferences - Get current user's preferences
 router.get('/', authenticate, async (req, res) => {
   try {
-    let preferences = await UserPreference.findOne({ userId: req.user._id });
-    
+    const preferences = await UserPreference.findOne({ userId: req.user._id });
+
     // Return defaults if no preferences exist yet
     if (!preferences) {
       return res.json({
@@ -16,8 +16,8 @@ router.get('/', authenticate, async (req, res) => {
           fontSize: 'medium',
           language: 'en',
           notifications: { email: false, sound: true },
-          chatSettings: { showTimestamps: true, enterToSend: true, followUpSuggestions: true }
-        }
+          chatSettings: { showTimestamps: true, enterToSend: true, followUpSuggestions: true },
+        },
       });
     }
 
@@ -44,16 +44,16 @@ router.put('/', authenticate, async (req, res) => {
     const preferences = await UserPreference.findOneAndUpdate(
       { userId: req.user._id },
       { $set: updates },
-      { new: true, upsert: true, runValidators: true }
+      { new: true, upsert: true, runValidators: true },
     );
 
     res.json({
       message: 'Preferences updated successfully.',
-      preferences
+      preferences,
     });
   } catch (error) {
     if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(e => e.message);
+      const messages = Object.values(error.errors).map((e) => e.message);
       return res.status(400).json({ error: messages.join(', ') });
     }
     res.status(500).json({ error: 'Server error updating preferences.' });

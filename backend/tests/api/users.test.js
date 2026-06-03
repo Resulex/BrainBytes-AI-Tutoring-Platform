@@ -1,6 +1,12 @@
 const request = require('supertest');
 const User = require('../../models/User');
-const { createApp, createTestUser, connectToDatabase, disconnectFromDatabase, clearCollections } = require('../setup');
+const {
+  createApp,
+  createTestUser,
+  connectToDatabase,
+  disconnectFromDatabase,
+  clearCollections,
+} = require('../setup');
 
 const app = createApp();
 
@@ -48,9 +54,7 @@ describe('Users API — PUT /api/users/:id', () => {
   test('should reject update without auth', async () => {
     const { user } = await createTestUser();
 
-    const res = await request(app)
-      .put(`/api/users/${user._id}`)
-      .send({ name: 'Hacker' });
+    const res = await request(app).put(`/api/users/${user._id}`).send({ name: 'Hacker' });
 
     expect(res.status).toBe(401);
   });

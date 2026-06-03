@@ -11,7 +11,7 @@ router.post('/', optionalAuth, async (req, res) => {
       userId: req.user ? req.user._id : null,
       subject: req.body.subject || '',
       deviceInfo: req.headers['user-agent'] || '',
-      ipAddress: req.ip || ''
+      ipAddress: req.ip || '',
     });
     await session.save();
     res.status(201).json({ session });
@@ -32,15 +32,14 @@ router.get('/', optionalAuth, async (req, res) => {
       query.userId = null;
     }
 
-    if (active === 'true') query.isActive = true;
+    if (active === 'true') {
+      query.isActive = true;
+    }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const [sessions, total] = await Promise.all([
-      Session.find(query)
-        .sort({ lastActivity: -1 })
-        .skip(skip)
-        .limit(parseInt(limit)),
-      Session.countDocuments(query)
+      Session.find(query).sort({ lastActivity: -1 }).skip(skip).limit(parseInt(limit)),
+      Session.countDocuments(query),
     ]);
 
     res.json({
@@ -49,8 +48,8 @@ router.get('/', optionalAuth, async (req, res) => {
         currentPage: parseInt(page),
         totalPages: Math.ceil(total / parseInt(limit)),
         totalItems: total,
-        itemsPerPage: parseInt(limit)
-      }
+        itemsPerPage: parseInt(limit),
+      },
     });
   } catch (error) {
     res.status(500).json({ error: 'Server error fetching sessions.' });
@@ -65,8 +64,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'Session not found.' });
     }
 
-    const messages = await Message.find({ sessionId: session._id })
-      .sort({ createdAt: 1 });
+    const messages = await Message.find({ sessionId: session._id }).sort({ createdAt: 1 });
 
     res.json({ session, messages });
   } catch (error) {
@@ -81,7 +79,9 @@ router.get('/:id', optionalAuth, async (req, res) => {
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const updates = {};
-    if (req.body.subject) updates.subject = req.body.subject;
+    if (req.body.subject) {
+      updates.subject = req.body.subject;
+    }
     if (req.body.isActive === false) {
       updates.isActive = false;
       updates.endedAt = Date.now();
@@ -90,7 +90,7 @@ router.put('/:id', authenticate, async (req, res) => {
     const session = await Session.findByIdAndUpdate(
       req.params.id,
       { ...updates, lastActivity: Date.now() },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!session) {

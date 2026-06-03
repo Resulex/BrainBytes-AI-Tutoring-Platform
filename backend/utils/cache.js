@@ -14,14 +14,16 @@ class MemoryCache {
    */
   get(key) {
     const entry = this.cache.get(key);
-    if (!entry) return null;
-    
+    if (!entry) {
+      return null;
+    }
+
     // Check expiry
     if (Date.now() > entry.expiry) {
       this.cache.delete(key);
       return null;
     }
-    
+
     // Move to end (LRU tracking) - delete and re-set
     this.cache.delete(key);
     this.cache.set(key, entry);
@@ -37,10 +39,10 @@ class MemoryCache {
       const firstKey = this.cache.keys().next().value;
       this.cache.delete(firstKey);
     }
-    
+
     this.cache.set(key, {
       data,
-      expiry: Date.now() + (customTtl || this.ttl)
+      expiry: Date.now() + (customTtl || this.ttl),
     });
   }
 
@@ -65,7 +67,7 @@ class MemoryCache {
     return {
       size: this.cache.size,
       maxSize: this.maxSize,
-      ttl: this.ttl / 1000
+      ttl: this.ttl / 1000,
     };
   }
 }
@@ -77,11 +79,13 @@ const cache = new MemoryCache();
 function cacheMiddleware(durationSeconds = 300) {
   return (req, res, next) => {
     // Only cache GET requests
-    if (req.method !== 'GET') return next();
+    if (req.method !== 'GET') {
+      return next();
+    }
 
     const key = `__cache__${req.originalUrl}`;
     const cached = cache.get(key);
-    
+
     if (cached) {
       return res.json(cached);
     }
@@ -115,5 +119,5 @@ module.exports = {
   cacheMiddleware,
   buildUserCacheKey,
   buildSessionCacheKey,
-  buildMessagesCacheKey
+  buildMessagesCacheKey,
 };

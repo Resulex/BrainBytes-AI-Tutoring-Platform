@@ -9,20 +9,19 @@ const DYNAMIC_CACHE = `brainbytes-dynamic-${CACHE_VERSION}`;
 const API_CACHE = `brainbytes-api-${CACHE_VERSION}`;
 
 // Assets to pre-cache on install
-const PRECACHE_ASSETS = [
-  '/',
-  '/manifest.json',
-  '/offline.html'
-];
+const PRECACHE_ASSETS = ['/', '/manifest.json', '/offline.html'];
 
 // Install event - pre-cache key assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => {
-      return cache.addAll(PRECACHE_ASSETS);
-    }).then(() => {
-      return self.skipWaiting();
-    })
+    caches
+      .open(STATIC_CACHE)
+      .then((cache) => {
+        return cache.addAll(PRECACHE_ASSETS);
+      })
+      .then(() => {
+        return self.skipWaiting();
+      }),
   );
 });
 
@@ -30,25 +29,28 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   const validCaches = [STATIC_CACHE, DYNAMIC_CACHE, API_CACHE];
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (!validCaches.includes(cacheName)) {
-            console.log('Clearing old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => {
-      return self.clients.claim();
-    })
+    caches
+      .keys()
+      .then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (!validCaches.includes(cacheName)) {
+              console.log('Clearing old cache:', cacheName);
+              return caches.delete(cacheName);
+            }
+          }),
+        );
+      })
+      .then(() => {
+        return self.clients.claim();
+      }),
   );
 });
 
 // Helper: is this an API request?
 function isApiRequest(url) {
   const apiPatterns = ['/api/', '/_next/'];
-  return apiPatterns.some(pattern => url.includes(pattern));
+  return apiPatterns.some((pattern) => url.includes(pattern));
 }
 
 // Helper: is this a navigation request?
@@ -58,8 +60,20 @@ function isNavigationRequest(request) {
 
 // Helper: is this a static asset?
 function isStaticAsset(url) {
-  const staticExtensions = ['.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.json'];
-  return staticExtensions.some(ext => url.endsWith(ext));
+  const staticExtensions = [
+    '.js',
+    '.css',
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.svg',
+    '.ico',
+    '.woff',
+    '.woff2',
+    '.json',
+  ];
+  return staticExtensions.some((ext) => url.endsWith(ext));
 }
 
 // Fetch event - serve from cache or network with offline fallback
@@ -87,12 +101,15 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           // Try cache fallback
           return caches.match(request).then((cached) => {
-            return cached || new Response(
-              JSON.stringify({ error: 'You are offline. Please check your connection.' }),
-              { status: 503, headers: { 'Content-Type': 'application/json' } }
+            return (
+              cached ||
+              new Response(
+                JSON.stringify({ error: 'You are offline. Please check your connection.' }),
+                { status: 503, headers: { 'Content-Type': 'application/json' } },
+              )
             );
           });
-        })
+        }),
     );
     return;
   }
@@ -101,14 +118,17 @@ self.addEventListener('fetch', (event) => {
   if (isStaticAsset(request.url)) {
     event.respondWith(
       caches.match(request).then((cached) => {
-        return cached || fetch(request).then((response) => {
-          const clone = response.clone();
-          caches.open(STATIC_CACHE).then((cache) => {
-            cache.put(request, clone);
-          });
-          return response;
-        });
-      })
+        return (
+          cached ||
+          fetch(request).then((response) => {
+            const clone = response.clone();
+            caches.open(STATIC_CACHE).then((cache) => {
+              cache.put(request, clone);
+            });
+            return response;
+          })
+        );
+      }),
     );
     return;
   }
@@ -129,15 +149,13 @@ self.addEventListener('fetch', (event) => {
           return caches.match(request).then((cached) => {
             return cached || caches.match('/offline.html');
           });
-        })
+        }),
     );
     return;
   }
 
   // Default: network first
-  event.respondWith(
-    fetch(request).catch(() => caches.match(request))
-  );
+  event.respondWith(fetch(request).catch(() => caches.match(request)));
 });
 
 // Background sync for offline messages
@@ -150,7 +168,7 @@ self.addEventListener('sync', (event) => {
 async function syncMessages() {
   try {
     const clients = await self.clients.matchAll();
-    clients.forEach(client => {
+    clients.forEach((client) => {
       client.postMessage({ type: 'SYNC_MESSAGES' });
     });
   } catch (error) {

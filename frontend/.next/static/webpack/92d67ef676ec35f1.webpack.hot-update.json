@@ -1,0 +1,8 @@
+{
+  "c": ["webpack"],
+  "r": ["pages/dashboard"],
+  "m": [
+    "./node_modules/next/dist/build/webpack/loaders/next-client-pages-loader.js?absolutePagePath=%2Fusr%2Fsrc%2Fapp%2Fpages%2Fdashboard.js&page=%2Fdashboard!",
+    "./pages/dashboard.js"
+  ]
+}

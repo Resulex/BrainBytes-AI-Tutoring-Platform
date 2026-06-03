@@ -5,43 +5,43 @@ const userPreferenceSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    unique: true
+    unique: true,
   },
   theme: {
     type: String,
     enum: ['light', 'dark', 'auto'],
-    default: 'light'
+    default: 'light',
   },
   fontSize: {
     type: String,
     enum: ['small', 'medium', 'large'],
-    default: 'medium'
+    default: 'medium',
   },
   language: {
     type: String,
     enum: ['en', 'fil', 'tl'],
-    default: 'en'
+    default: 'en',
   },
   notifications: {
     email: { type: Boolean, default: false },
-    sound: { type: Boolean, default: true }
+    sound: { type: Boolean, default: true },
   },
   chatSettings: {
     showTimestamps: { type: Boolean, default: true },
     enterToSend: { type: Boolean, default: true },
-    followUpSuggestions: { type: Boolean, default: true }
+    followUpSuggestions: { type: Boolean, default: true },
   },
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
-userPreferenceSchema.pre('save', function(next) {
+userPreferenceSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });

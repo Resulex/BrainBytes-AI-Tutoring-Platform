@@ -11,21 +11,21 @@ router.post('/', async (req, res) => {
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ 
-        error: 'User with this email already exists' 
+      return res.status(400).json({
+        error: 'User with this email already exists',
       });
     }
 
     const user = new User({ name, email, preferredSubjects });
     await user.save();
-    
+
     res.status(201).json({
       message: 'User profile created successfully',
-      user
+      user,
     });
   } catch (error) {
     if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(e => e.message);
+      const messages = Object.values(error.errors).map((e) => e.message);
       return res.status(400).json({ error: messages.join(', ') });
     }
     res.status(500).json({ error: 'Server error while creating user' });
@@ -63,16 +63,23 @@ router.put('/:id', authenticate, async (req, res) => {
   try {
     const { name, email, bio, preferredSubjects } = req.body;
     const updates = { updatedAt: Date.now() };
-    if (name !== undefined) updates.name = name;
-    if (email !== undefined) updates.email = email;
-    if (bio !== undefined) updates.bio = bio;
-    if (preferredSubjects !== undefined) updates.preferredSubjects = preferredSubjects;
-    
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      updates,
-      { new: true, runValidators: true }
-    );
+    if (name !== undefined) {
+      updates.name = name;
+    }
+    if (email !== undefined) {
+      updates.email = email;
+    }
+    if (bio !== undefined) {
+      updates.bio = bio;
+    }
+    if (preferredSubjects !== undefined) {
+      updates.preferredSubjects = preferredSubjects;
+    }
+
+    const user = await User.findByIdAndUpdate(req.user._id, updates, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -80,11 +87,11 @@ router.put('/:id', authenticate, async (req, res) => {
 
     res.json({
       message: 'User profile updated successfully',
-      user
+      user,
     });
   } catch (error) {
     if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(e => e.message);
+      const messages = Object.values(error.errors).map((e) => e.message);
       return res.status(400).json({ error: messages.join(', ') });
     }
     if (error.name === 'CastError') {

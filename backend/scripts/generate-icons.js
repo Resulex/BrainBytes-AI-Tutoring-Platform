@@ -1,7 +1,7 @@
 /**
  * Generate placeholder PWA icons for development.
  * In production, replace these with proper designed icons.
- * 
+ *
  * Usage: node scripts/generate-icons.js
  * Requires: node (no external deps)
  */

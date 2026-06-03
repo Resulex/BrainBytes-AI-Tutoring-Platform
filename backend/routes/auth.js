@@ -33,7 +33,7 @@ router.post('/register', async (req, res) => {
       name,
       email: email.toLowerCase(),
       password: hashedPassword,
-      preferredSubjects: preferredSubjects || []
+      preferredSubjects: preferredSubjects || [],
     });
 
     await user.save();
@@ -49,12 +49,12 @@ router.post('/register', async (req, res) => {
         name: user.name,
         email: user.email,
         preferredSubjects: user.preferredSubjects,
-        role: user.role
-      }
+        role: user.role,
+      },
     });
   } catch (error) {
     if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(e => e.message);
+      const messages = Object.values(error.errors).map((e) => e.message);
       return res.status(400).json({ error: messages.join(', ') });
     }
     console.error('Registration error:', error);
@@ -96,8 +96,8 @@ router.post('/login', async (req, res) => {
         preferredSubjects: user.preferredSubjects,
         role: user.role,
         bio: user.bio,
-        avatarUrl: user.avatarUrl
-      }
+        avatarUrl: user.avatarUrl,
+      },
     });
   } catch (error) {
     console.error('Login error:', error);

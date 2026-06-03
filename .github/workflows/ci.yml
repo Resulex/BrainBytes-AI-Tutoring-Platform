@@ -7,42 +7,143 @@ on:
     branches: [ main, development ]
 
 jobs:
-  test:
-    name: Run Tests
+  # LINT
+  lint:
+    name: Lint Code
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
 
-      # --- FRONTEND ---
-      - name: Set up Node.js for Frontend
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '16'
-          cache: 'npm'
-          cache-dependency-path: ./frontend/package-lock.json
+
+      # Cache frontend dependencies
+      - name: Cache frontend node_modules
+        uses: actions/cache@v3
+        id: cache-frontend-lint
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-frontend-${{ hashFiles('frontend/package-lock.json') }}
 
       - name: Install frontend dependencies
+        if: steps.cache-frontend-lint.outputs.cache-hit != 'true'
         working-directory: ./frontend
-        run: npm install
-      
-      # - name: Run frontend tests
-      #   working-directory: ./frontend
-      #   run: npm test
+        run: npm ci --prefer-offline
 
-      # --- BACKEND ---
-      - name: Set up Node.js for Backend
-        uses: actions/setup-node@v3
+      - name: Lint frontend code
+        working-directory: ./frontend
+        run: npm run lint || echo "::warning::Frontend linting failed"
+
+      # Cache backend dependencies
+      - name: Cache backend node_modules
+        uses: actions/cache@v3
+        id: cache-backend-lint
         with:
-          node-version: '16'
-          cache: 'npm'
-          cache-dependency-path: ./backend/package-lock.json
+          path: backend/node_modules
+          key: ${{ runner.os }}-backend-${{ hashFiles('backend/package-lock.json') }}
 
       - name: Install backend dependencies
+        if: steps.cache-backend-lint.outputs.cache-hit != 'true'
         working-directory: ./backend
-        run: npm install
+        run: npm ci --prefer-offline
+
+      - name: Lint backend code
+        working-directory: ./backend
+        run: npm run lint || echo "::warning::Backend linting failed"
+
+  # TEST (matrix across Node versions)
+  test:
+    name: Test (Node ${{ matrix.node-version }})
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [14, 16, 18, 20]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      # --- FRONTEND ---
+      - name: Cache frontend node_modules
+        uses: actions/cache@v3
+        id: cache-frontend-test
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-frontend-${{ matrix.node-version }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install frontend dependencies
+        if: steps.cache-frontend-test.outputs.cache-hit != 'true'
+        working-directory: ./frontend
+        run: npm ci --prefer-offline
+
+      - name: Run frontend tests
+        working-directory: ./frontend
+        run: npm test || echo "::warning::Frontend tests failed"
+        continue-on-error: true
+
+      # --- BACKEND ---
+      - name: Cache backend node_modules
+        uses: actions/cache@v3
+        id: cache-backend-test
+        with:
+          path: backend/node_modules
+          key: ${{ runner.os }}-backend-${{ matrix.node-version }}-${{ hashFiles('backend/package-lock.json') }}
+
+      - name: Install backend dependencies
+        if: steps.cache-backend-test.outputs.cache-hit != 'true'
+        working-directory: ./backend
+        run: npm ci --prefer-offline
 
       - name: Run backend tests
         working-directory: ./backend
         run: npm test
+
+      # Upload test artifacts
+      - name: Upload backend test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-node-${{ matrix.node-version }}
+          path: |
+            backend/coverage/
+            backend/junit.xml
+
+  # NOTIFY
+  notify:
+    name: Notify Status
+    needs: [lint, test]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Send email notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "BrainBytes CI: ${{ job.status }} — ${{ github.ref_name }}"
+          to: ${{ secrets.MAIL_TO }}
+          from: ${{ secrets.MAIL_FROM }}
+          body: |
+            Workflow: ${{ github.workflow }}
+            Status: ${{ job.status }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

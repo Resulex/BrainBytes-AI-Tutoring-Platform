@@ -48,8 +48,8 @@ function createApp() {
         messages: '/api/messages',
         materials: '/api/materials',
         sessions: '/api/sessions',
-        preferences: '/api/preferences'
-      }
+        preferences: '/api/preferences',
+      },
     });
   });
 
@@ -64,13 +64,21 @@ function createApp() {
       if (before) query.createdAt = { $lt: new Date(before) };
       const [messages, total] = await Promise.all([
         Message.find(query).sort({ createdAt: -1 }).skip(skip).limit(pageSize),
-        Message.countDocuments(query)
+        Message.countDocuments(query),
       ]);
       res.json({
         messages: messages.reverse(),
-        pagination: { currentPage: parseInt(page), totalPages: Math.ceil(total / pageSize), totalItems: total, itemsPerPage: pageSize, hasMore: skip + pageSize < total }
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(total / pageSize),
+          totalItems: total,
+          itemsPerPage: pageSize,
+          hasMore: skip + pageSize < total,
+        },
       });
-    } catch (err) { next(err); }
+    } catch (err) {
+      next(err);
+    }
   });
 
   // POST /api/messages - Create a message and get AI response
@@ -83,7 +91,7 @@ function createApp() {
       const userMessage = new Message({
         text: sanitizedText,
         isUser: true,
-        sessionId: sessionId || null
+        sessionId: sessionId || null,
       });
       await userMessage.save();
 
@@ -95,19 +103,19 @@ function createApp() {
       // Gather context if session ID provided
       let context = null;
       if (sessionId) {
-        const recentMessages = await Message.find({ sessionId })
-          .sort({ createdAt: -1 })
-          .limit(10);
+        const recentMessages = await Message.find({ sessionId }).sort({ createdAt: -1 }).limit(10);
         context = buildConversationContext(recentMessages.reverse());
       }
 
       // Generate AI response
-      const aiResult = await aiService.generateResponse(sanitizedText, subject, context)
-        .catch(error => {
+      const aiResult = await aiService
+        .generateResponse(sanitizedText, subject, context)
+        .catch((error) => {
           console.error('AI response failed:', error);
           return {
             category: 'error',
-            response: "I'm sorry, but I couldn't process your request in time. Please try again with a simpler question."
+            response:
+              "I'm sorry, but I couldn't process your request in time. Please try again with a simpler question.",
           };
         });
 
@@ -124,7 +132,7 @@ function createApp() {
         sessionId: sessionId || null,
         category: aiResult.category,
         followUps,
-        formattedContent: formatted
+        formattedContent: formatted,
       });
       await aiMessage.save();
 
@@ -133,7 +141,7 @@ function createApp() {
         userMessage,
         aiMessage,
         category: aiResult.category,
-        followUps
+        followUps,
       });
     } catch (err) {
       next(err);
@@ -196,4 +204,11 @@ async function clearCollections() {
   cache.flush();
 }
 
-module.exports = { createApp, createTestUser, generateToken, connectToDatabase, disconnectFromDatabase, clearCollections };
+module.exports = {
+  createApp,
+  createTestUser,
+  generateToken,
+  connectToDatabase,
+  disconnectFromDatabase,
+  clearCollections,
+};

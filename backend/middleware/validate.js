@@ -22,8 +22,12 @@ const validators = {
 
   login: (body) => {
     const errors = [];
-    if (!body.email) errors.push('Email is required.');
-    if (!body.password) errors.push('Password is required.');
+    if (!body.email) {
+      errors.push('Email is required.');
+    }
+    if (!body.password) {
+      errors.push('Password is required.');
+    }
     return errors;
   },
 
@@ -98,14 +102,20 @@ const validators = {
   // Learning Materials
   learningMaterial: (body) => {
     const errors = [];
-    if (!body.subject) errors.push('Subject is required.');
-    if (!body.topic || body.topic.length < 3) errors.push('Topic must be at least 3 characters.');
-    if (!body.content || body.content.length < 10) errors.push('Content must be at least 10 characters.');
+    if (!body.subject) {
+      errors.push('Subject is required.');
+    }
+    if (!body.topic || body.topic.length < 3) {
+      errors.push('Topic must be at least 3 characters.');
+    }
+    if (!body.content || body.content.length < 10) {
+      errors.push('Content must be at least 10 characters.');
+    }
     if (body.difficulty && !['beginner', 'intermediate', 'advanced'].includes(body.difficulty)) {
       errors.push('Difficulty must be: beginner, intermediate, or advanced.');
     }
     return errors;
-  }
+  },
 };
 
 /**
@@ -124,7 +134,7 @@ function validate(schemaName) {
     if (errors.length > 0) {
       return res.status(400).json({
         error: 'Validation failed.',
-        details: errors
+        details: errors,
       });
     }
 
@@ -136,7 +146,9 @@ function validate(schemaName) {
  * Sanitize string inputs - trim and strip dangerous characters.
  */
 function sanitize(str) {
-  if (typeof str !== 'string') return str;
+  if (typeof str !== 'string') {
+    return str;
+  }
   return str.trim().replace(/[<>]/g, '');
 }
 
@@ -144,7 +156,9 @@ function sanitize(str) {
  * Sanitize all string fields in an object recursively.
  */
 function sanitizeObject(obj) {
-  if (!obj || typeof obj !== 'object') return obj;
+  if (!obj || typeof obj !== 'object') {
+    return obj;
+  }
   const sanitized = Array.isArray(obj) ? [] : {};
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === 'string') {
@@ -162,5 +176,5 @@ module.exports = {
   validate,
   sanitize,
   sanitizeObject,
-  validators
+  validators,
 };

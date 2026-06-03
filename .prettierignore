@@ -1,0 +1,14 @@
+node_modules/
+.next/
+coverage/
+playwright-report/
+test-results/
+dist/
+build/
+*.lock
+package-lock.json
+docker-compose*.yml
+Dockerfile*
+.env
+*.md
+*.log

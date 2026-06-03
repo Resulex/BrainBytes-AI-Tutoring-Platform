@@ -14,7 +14,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const storedToken = localStorage.getItem('brainbytes_token');
     const storedUser = localStorage.getItem('brainbytes_user');
-    
+
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
@@ -28,7 +28,7 @@ export function AuthProvider({ children }) {
   const verifyToken = async (t) => {
     try {
       const res = await axios.get(`${API_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${t}` }
+        headers: { Authorization: `Bearer ${t}` },
       });
       setUser(res.data.user);
       localStorage.setItem('brainbytes_user', JSON.stringify(res.data.user));
@@ -54,7 +54,10 @@ export function AuthProvider({ children }) {
 
   const register = useCallback(async (name, email, password, preferredSubjects) => {
     const res = await axios.post(`${API_URL}/api/auth/register`, {
-      name, email, password, preferredSubjects
+      name,
+      email,
+      password,
+      preferredSubjects,
     });
     const { token: newToken, user: userData } = res.data;
     setToken(newToken);
@@ -86,11 +89,18 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   return (
-    <AuthContext.Provider value={{
-      user, token, loading,
-      login, register, logout, updateUser,
-      isAuthenticated: !!token
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        login,
+        register,
+        logout,
+        updateUser,
+        isAuthenticated: !!token,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

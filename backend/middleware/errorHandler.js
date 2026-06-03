@@ -20,7 +20,7 @@ function handleCastError(err) {
 }
 
 function handleValidationError(err) {
-  const messages = Object.values(err.errors).map(e => e.message);
+  const messages = Object.values(err.errors).map((e) => e.message);
   return new AppError('Validation failed.', 400, messages);
 }
 
@@ -39,13 +39,13 @@ function handleJWTExpiredError() {
 }
 
 // Main error handling middleware
-function errorHandler(err, req, res, next) {
+function errorHandler(err, req, res, _next) {
   // Log the error
   console.error(`[${new Date().toISOString()}] Error:`, {
     message: err.message,
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
     path: req.originalUrl,
-    method: req.method
+    method: req.method,
   });
 
   // Default to 500
@@ -53,26 +53,36 @@ function errorHandler(err, req, res, next) {
   error.message = err.message;
 
   // Handle Mongoose errors
-  if (err.name === 'CastError') error = handleCastError(err);
-  if (err.name === 'ValidationError') error = handleValidationError(err);
-  if (err.code === 11000) error = handleDuplicateKeyError(err);
+  if (err.name === 'CastError') {
+    error = handleCastError(err);
+  }
+  if (err.name === 'ValidationError') {
+    error = handleValidationError(err);
+  }
+  if (err.code === 11000) {
+    error = handleDuplicateKeyError(err);
+  }
 
   // Handle JWT errors
-  if (err.name === 'JsonWebTokenError') error = handleJWTError();
-  if (err.name === 'TokenExpiredError') error = handleJWTExpiredError();
+  if (err.name === 'JsonWebTokenError') {
+    error = handleJWTError();
+  }
+  if (err.name === 'TokenExpiredError') {
+    error = handleJWTExpiredError();
+  }
 
   // Handle rate limit errors
   if (err.name === 'RateLimitError') {
     return res.status(429).json({
       error: 'Too many requests. Please try again later.',
-      retryAfter: Math.ceil(err.msBeforeNext / 1000)
+      retryAfter: Math.ceil(err.msBeforeNext / 1000),
     });
   }
 
   // Build response
   const statusCode = error.statusCode || 500;
   const response = {
-    error: error.message || 'Internal server error.'
+    error: error.message || 'Internal server error.',
   };
 
   if (error.details) {
@@ -102,5 +112,5 @@ module.exports = {
   AppError,
   errorHandler,
   notFoundHandler,
-  catchAsync
+  catchAsync,
 };

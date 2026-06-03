@@ -9,21 +9,21 @@ function buildConversationContext(messages, maxHistory = 6) {
 
   // Take the most recent messages for context
   const recent = messages.slice(-maxHistory);
-  
-  const exchanges = recent.map(msg => ({
+
+  const exchanges = recent.map((msg) => ({
     role: msg.isUser ? 'user' : 'assistant',
-    text: msg.text
+    text: msg.text,
   }));
 
   // Create a concise summary
   const summary = exchanges
-    .map(e => `${e.role === 'user' ? 'Student' : 'Tutor'}: ${e.text}`)
+    .map((e) => `${e.role === 'user' ? 'Student' : 'Tutor'}: ${e.text}`)
     .join('\n');
 
   return {
     summary,
     recentExchanges: exchanges,
-    messageCount: messages.length
+    messageCount: messages.length,
   };
 }
 
@@ -86,7 +86,7 @@ Please:
 2. Use simple language
 3. Provide examples where helpful
 4. Break down complex topics
-5. Be encouraging and supportive`
+5. Be encouraging and supportive`,
   };
 
   return templates[category] || templates.general;

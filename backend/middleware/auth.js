@@ -29,7 +29,7 @@ const authenticate = async (req, res, next) => {
 
     // Verify token
     const decoded = jwt.verify(token, JWT_SECRET);
-    
+
     // Check if user still exists
     const user = await User.findById(decoded.id).select('-password');
     if (!user) {
@@ -60,7 +60,9 @@ const optionalAuth = async (req, res, next) => {
     if (token) {
       const decoded = jwt.verify(token, JWT_SECRET);
       const user = await User.findById(decoded.id).select('-password');
-      if (user) req.user = user;
+      if (user) {
+        req.user = user;
+      }
     }
   } catch (error) {
     // Silently continue without auth
@@ -72,5 +74,5 @@ module.exports = {
   generateToken,
   authenticate,
   optionalAuth,
-  JWT_SECRET
+  JWT_SECRET,
 };

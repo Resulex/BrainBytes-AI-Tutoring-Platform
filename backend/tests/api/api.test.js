@@ -1,6 +1,12 @@
 const request = require('supertest');
 const Message = require('../../models/Message');
-const { createApp, createTestUser, connectToDatabase, disconnectFromDatabase, clearCollections } = require('../setup');
+const {
+  createApp,
+  createTestUser,
+  connectToDatabase,
+  disconnectFromDatabase,
+  clearCollections,
+} = require('../setup');
 
 const app = createApp();
 
@@ -32,9 +38,7 @@ describe('Health Check — GET /', () => {
 
 describe('Chat API — POST /api/messages', () => {
   test('should send a message and receive AI response', async () => {
-    const res = await request(app)
-      .post('/api/messages')
-      .send({ text: 'What is 1+1?' });
+    const res = await request(app).post('/api/messages').send({ text: 'What is 1+1?' });
 
     expect(res.status).toBe(201);
     expect(res.body.userMessage).toBeDefined();
@@ -49,9 +53,7 @@ describe('Chat API — POST /api/messages', () => {
   });
 
   test('should persist both user and AI messages to database', async () => {
-    await request(app)
-      .post('/api/messages')
-      .send({ text: 'Explain evaporation' });
+    await request(app).post('/api/messages').send({ text: 'Explain evaporation' });
 
     const messages = await Message.find().sort({ createdAt: 1 });
     expect(messages.length).toBe(2);
@@ -104,18 +106,14 @@ describe('Chat API — POST /api/messages', () => {
   });
 
   test('should reject empty message text', async () => {
-    const res = await request(app)
-      .post('/api/messages')
-      .send({ text: '   ' });
+    const res = await request(app).post('/api/messages').send({ text: '   ' });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
   });
 
   test('should reject missing text field', async () => {
-    const res = await request(app)
-      .post('/api/messages')
-      .send({ subject: 'math' });
+    const res = await request(app).post('/api/messages').send({ subject: 'math' });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
@@ -125,9 +123,7 @@ describe('Chat API — POST /api/messages', () => {
     const originalToken = process.env.HUGGINGFACE_TOKEN;
     delete process.env.HUGGINGFACE_TOKEN;
 
-    const res = await request(app)
-      .post('/api/messages')
-      .send({ text: 'This should still work' });
+    const res = await request(app).post('/api/messages').send({ text: 'This should still work' });
 
     expect(res.status).toBe(201);
     expect(res.body.userMessage).toBeDefined();
@@ -146,9 +142,7 @@ describe('History API — GET /api/messages', () => {
     await Message.create({ text: 'Hello', isUser: true, userId: user._id });
     await Message.create({ text: 'Hi there!', isUser: false, userId: user._id });
 
-    const res = await request(app)
-      .get('/api/messages')
-      .set('Authorization', `Bearer ${token}`);
+    const res = await request(app).get('/api/messages').set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(res.body.messages.length).toBe(2);
@@ -201,9 +195,7 @@ describe('History API — GET /api/messages', () => {
     await Message.create({ text: 'User1 message', isUser: true, userId: user1._id });
     await Message.create({ text: 'User2 message', isUser: true, userId: user2._id });
 
-    const res = await request(app)
-      .get('/api/messages')
-      .set('Authorization', `Bearer ${token1}`);
+    const res = await request(app).get('/api/messages').set('Authorization', `Bearer ${token1}`);
 
     expect(res.status).toBe(200);
     expect(res.body.messages.length).toBe(1);

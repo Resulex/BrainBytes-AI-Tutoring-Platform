@@ -18,7 +18,7 @@ export default function useSocket(sessionId) {
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000
+      reconnectionDelayMax: 10000,
     });
 
     socket.on('connect', () => {
@@ -60,25 +60,34 @@ export default function useSocket(sessionId) {
     }
   }, [sessionId]);
 
-  const emitTyping = useCallback((isTyping) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit('chat:typing', { isTyping, sessionId });
-    }
-  }, [sessionId]);
+  const emitTyping = useCallback(
+    (isTyping) => {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('chat:typing', { isTyping, sessionId });
+      }
+    },
+    [sessionId],
+  );
 
-  const emitReadReceipt = useCallback((messageIds) => {
-    if (socketRef.current?.connected && messageIds.length > 0) {
-      socketRef.current.emit('chat:readReceipt', { messageIds, sessionId });
-    }
-  }, [sessionId]);
+  const emitReadReceipt = useCallback(
+    (messageIds) => {
+      if (socketRef.current?.connected && messageIds.length > 0) {
+        socketRef.current.emit('chat:readReceipt', { messageIds, sessionId });
+      }
+    },
+    [sessionId],
+  );
 
-  const emitMessage = useCallback((text, subject) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit('chat:message', { text, subject, sessionId });
-      return true;
-    }
-    return false;
-  }, [sessionId]);
+  const emitMessage = useCallback(
+    (text, subject) => {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('chat:message', { text, subject, sessionId });
+        return true;
+      }
+      return false;
+    },
+    [sessionId],
+  );
 
   const socket = socketRef.current;
 
@@ -88,6 +97,6 @@ export default function useSocket(sessionId) {
     onlineCount,
     emitTyping,
     emitReadReceipt,
-    emitMessage
+    emitMessage,
   };
 }
