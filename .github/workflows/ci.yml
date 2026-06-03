@@ -15,16 +15,16 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: '20'
 
       # Cache frontend dependencies
       - name: Cache frontend node_modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-frontend-lint
         with:
           path: frontend/node_modules
@@ -41,7 +41,7 @@ jobs:
 
       # Cache backend dependencies
       - name: Cache backend node_modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-backend-lint
         with:
           path: backend/node_modules
@@ -69,16 +69,16 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
 
       # --- FRONTEND ---
       - name: Cache frontend node_modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-frontend-test
         with:
           path: frontend/node_modules
@@ -96,7 +96,7 @@ jobs:
 
       # --- BACKEND ---
       - name: Cache backend node_modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-backend-test
         with:
           path: backend/node_modules
@@ -114,7 +114,7 @@ jobs:
       # Upload test artifacts
       - name: Upload backend test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-results-node-${{ matrix.node-version }}
           path: |
@@ -139,7 +139,7 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: "BrainBytes CI: ${{ job.status }} — ${{ github.ref_name }}"
           to: ${{ secrets.MAIL_TO }}
-          from: ${{ secrets.MAIL_FROM }}
+          from: BrainBytes CI
           body: |
             Workflow: ${{ github.workflow }}
             Status: ${{ job.status }}
