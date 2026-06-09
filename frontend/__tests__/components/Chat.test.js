@@ -5,7 +5,7 @@ import Chat from '../../components/Chat';
 global.fetch = jest.fn(() =>
   Promise.resolve({
     json: () => Promise.resolve({ messages: [] }),
-  })
+  }),
 );
 
 // jsdom doesn't implement scrollIntoView
@@ -51,9 +51,7 @@ describe('Chat Component', () => {
   });
 
   test('shows typing indicator when AI is responding', () => {
-    const messages = [
-      { _id: '1', text: 'Hello', isUser: true },
-    ];
+    const messages = [{ _id: '1', text: 'Hello', isUser: true }];
 
     render(<Chat messages={messages} isAiTyping={true} />);
 
