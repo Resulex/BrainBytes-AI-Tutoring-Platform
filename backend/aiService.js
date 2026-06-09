@@ -53,26 +53,26 @@ async function generateResponse(question, preferredSubject = null, _context = nu
   if (preferredSubject && ['math', 'science', 'history', 'general'].includes(preferredSubject)) {
     category = preferredSubject;
   } else if (
-      lowerQuestion.includes('math') ||
-      lowerQuestion.includes('algebra') ||
-      lowerQuestion.includes('calculus')
-    ) {
-      category = 'math';
-    } else if (
-      lowerQuestion.includes('science') ||
-      lowerQuestion.includes('physics') ||
-      lowerQuestion.includes('chemistry')
-    ) {
-      category = 'science';
-    } else if (
-      lowerQuestion.includes('history') ||
-      lowerQuestion.includes('war') ||
-      lowerQuestion.includes('century')
-    ) {
-      category = 'history';
-    } else {
-      category = 'general';
-    }
+    lowerQuestion.includes('math') ||
+    lowerQuestion.includes('algebra') ||
+    lowerQuestion.includes('calculus')
+  ) {
+    category = 'math';
+  } else if (
+    lowerQuestion.includes('science') ||
+    lowerQuestion.includes('physics') ||
+    lowerQuestion.includes('chemistry')
+  ) {
+    category = 'science';
+  } else if (
+    lowerQuestion.includes('history') ||
+    lowerQuestion.includes('war') ||
+    lowerQuestion.includes('century')
+  ) {
+    category = 'history';
+  } else {
+    category = 'general';
+  }
 
   if (isFrustrated) {
     console.log('User may be frustrated. Providing empathetic response.');
