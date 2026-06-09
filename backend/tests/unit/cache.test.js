@@ -1,4 +1,9 @@
-const { cache, buildUserCacheKey, buildSessionCacheKey, buildMessagesCacheKey } = require('../../utils/cache');
+const {
+  cache,
+  buildUserCacheKey,
+  buildSessionCacheKey,
+  buildMessagesCacheKey,
+} = require('../../utils/cache');
 
 describe('MemoryCache (via singleton)', () => {
   beforeEach(() => {
