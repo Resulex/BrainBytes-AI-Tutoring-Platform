@@ -25,12 +25,15 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: ./backend
-        run: npm install
+        run: npm install --prefer-offline
 
-      - name: Run linting
-        run: |
-          cd frontend && npm run lint
-          cd ../backend && npm run lint
+      - name: Run frontend lint
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Run backend lint
+        working-directory: ./backend
+        run: npm run lint
 
       - name: Run frontend tests
         working-directory: ./frontend
