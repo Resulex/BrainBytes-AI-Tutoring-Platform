@@ -57,9 +57,7 @@ describe('useSocket', () => {
       const { result } = renderHook(() => useSocket(null), { wrapper });
 
       // Simulate connect event
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === 'connect',
-      )[1];
+      const connectHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'connect')[1];
 
       act(() => {
         connectHandler();
@@ -72,9 +70,7 @@ describe('useSocket', () => {
       const { result } = renderHook(() => useSocket(null), { wrapper });
 
       // First connect
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === 'connect',
-      )[1];
+      const connectHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'connect')[1];
       act(() => connectHandler());
       expect(result.current.isConnected).toBe(true);
 
@@ -92,9 +88,7 @@ describe('useSocket', () => {
     test('sets isConnected to false on connect_error', async () => {
       const { result } = renderHook(() => useSocket(null), { wrapper });
 
-      const errorHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === 'connect_error',
-      )[1];
+      const errorHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'connect_error')[1];
       act(() => {
         errorHandler(new Error('Connection refused'));
       });
@@ -118,9 +112,7 @@ describe('useSocket', () => {
       renderHook(() => useSocket('session-123'), { wrapper });
 
       // Find connect handler and fire it
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === 'connect',
-      )[1];
+      const connectHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'connect')[1];
       act(() => connectHandler());
 
       expect(mockSocket.emit).toHaveBeenCalledWith('session:join', {
@@ -131,18 +123,13 @@ describe('useSocket', () => {
     test('rejoins session when sessionId changes while connected', () => {
       mockSocket.connected = true;
 
-      const { rerender } = renderHook(
-        ({ sessionId }) => useSocket(sessionId),
-        {
-          initialProps: { sessionId: 'session-1' },
-          wrapper,
-        },
-      );
+      const { rerender } = renderHook(({ sessionId }) => useSocket(sessionId), {
+        initialProps: { sessionId: 'session-1' },
+        wrapper,
+      });
 
       // Trigger connect
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === 'connect',
-      )[1];
+      const connectHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'connect')[1];
       act(() => connectHandler());
 
       // Clear emit calls
@@ -161,9 +148,7 @@ describe('useSocket', () => {
 
       renderHook(() => useSocket(null), { wrapper });
 
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === 'connect',
-      )[1];
+      const connectHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'connect')[1];
       act(() => connectHandler());
 
       // session:join should not have been called
@@ -213,9 +198,7 @@ describe('useSocket', () => {
       });
 
       // emit may have been called for other events, but not for chat:typing
-      const typingCalls = mockSocket.emit.mock.calls.filter(
-        (call) => call[0] === 'chat:typing',
-      );
+      const typingCalls = mockSocket.emit.mock.calls.filter((call) => call[0] === 'chat:typing');
       expect(typingCalls).toHaveLength(0);
     });
 
@@ -285,14 +268,11 @@ describe('useSocket', () => {
         result.current.emitMessage('Hello world', 'science');
       });
 
-      const messageCalls = mockSocket.emit.mock.calls.filter(
-        (call) => call[0] === 'chat:message',
-      );
+      const messageCalls = mockSocket.emit.mock.calls.filter((call) => call[0] === 'chat:message');
       expect(messageCalls).toHaveLength(0);
     });
   });
 
-  describe('token change', () => {
   describe('token change', () => {
     test('uses token from AuthProvider in socket auth', async () => {
       // Rerender with same token — verify the socket receives it
@@ -309,6 +289,5 @@ describe('useSocket', () => {
         { timeout: 3000 },
       );
     });
-  });
   });
 });

@@ -300,9 +300,7 @@ describe('Chat Component', () => {
   });
 
   test('does not render follow-ups when absent', () => {
-    const messages = [
-      { _id: '1', text: 'Plain response', isUser: false, followUps: [] },
-    ];
+    const messages = [{ _id: '1', text: 'Plain response', isUser: false, followUps: [] }];
 
     render(<Chat messages={messages} />);
 
@@ -333,9 +331,7 @@ describe('Chat Component', () => {
   });
 
   test('renders message with data-testid per message', () => {
-    const messages = [
-      { _id: 'abc123', text: 'Unique message', isUser: true },
-    ];
+    const messages = [{ _id: 'abc123', text: 'Unique message', isUser: true }];
 
     render(<Chat messages={messages} />);
 
