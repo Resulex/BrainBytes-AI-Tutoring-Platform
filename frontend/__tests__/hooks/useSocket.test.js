@@ -113,8 +113,6 @@ describe('useSocket', () => {
 
   describe('session management', () => {
     test('emits session:join when connected and sessionId exists', () => {
-      // Mock connected state
-      const origOn = mockSocket.on;
       mockSocket.connected = true;
 
       renderHook(() => useSocket('session-123'), { wrapper });
