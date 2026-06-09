@@ -10,6 +10,15 @@ Status](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workf
 [![Docker Build
 Status](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/build.yml/badge.svg)](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/build.yml)
 
+[![Lint
+Status](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/lint.yml/badge.svg)](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/lint.yml)
+
+[![CI Test
+Status](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/test.yml/badge.svg)](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/test.yml)
+
+[![Deploy
+Status](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/deploy.yml/badge.svg)](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/deploy.yml)
+
 ## Project Overview
 BrainBytes is an AI-powered tutoring platform designed to provide accessible academic assistance to Filipino students. This project implements the platform using modern DevOps practices and containerization.
 
