@@ -31,14 +31,16 @@ jobs:
           path: frontend/node_modules
           key: ${{ runner.os }}-frontend-${{ hashFiles('frontend/package-lock.json') }}
 
+      - name: Install root dependencies (for eslint.config.mjs)
+        run: npm install --legacy-peer-deps
+
       - name: Install frontend dependencies
         if: steps.cache-frontend-lint.outputs.cache-hit != 'true'
         working-directory: ./frontend
-        run: npm install --prefer-offline
+        run: npm install --legacy-peer-deps --prefer-offline
 
       - name: Lint frontend code
-        working-directory: ./frontend
-        run: npm run lint || echo "::warning::Frontend linting failed"
+        run: npx eslint frontend/ || echo "::warning::Frontend linting failed"
 
       # Cache backend dependencies
       - name: Cache backend node_modules
@@ -54,8 +56,7 @@ jobs:
         run: npm install --prefer-offline
 
       - name: Lint backend code
-        working-directory: ./backend
-        run: npm run lint || echo "::warning::Backend linting failed"
+        run: npx eslint backend/ || echo "::warning::Backend linting failed"
 
   # TEST (matrix across Node versions)
   test:
@@ -88,7 +89,7 @@ jobs:
       - name: Install frontend dependencies
         if: steps.cache-frontend-test.outputs.cache-hit != 'true'
         working-directory: ./frontend
-        run: npm install --prefer-offline
+        run: npm install --legacy-peer-deps --prefer-offline
 
       - name: Run frontend tests
         working-directory: ./frontend
