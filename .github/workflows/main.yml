@@ -39,7 +39,9 @@ jobs:
         id: cache-frontend-quality
         with:
           path: frontend/node_modules
-          key: ${{ runner.os }}-frontend-${{ hashFiles('frontend/package-lock.json') }}
+          key: frontend-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            frontend-${{ runner.os }}-node20-
 
       - name: Install root dependencies (for eslint.config.mjs)
         run: npm install --legacy-peer-deps
@@ -55,7 +57,9 @@ jobs:
         id: cache-backend-quality
         with:
           path: backend/node_modules
-          key: ${{ runner.os }}-backend-${{ hashFiles('backend/package-lock.json') }}
+          key: backend-${{ runner.os }}-node20-${{ hashFiles('backend/package-lock.json') }}
+          restore-keys: |
+            backend-${{ runner.os }}-node20-
 
       - name: Install backend dependencies
         if: steps.cache-backend-quality.outputs.cache-hit != 'true'
@@ -127,9 +131,67 @@ jobs:
             echo "No large files detected."
           fi
 
-  # UNIT TESTS WITH COVERAGE (matrix across Node versions)
-  test:
-    name: Test (Node ${{ matrix.node-version }})
+  # ─── FRONTEND UNIT TESTS ──
+  test-frontend:
+    name: Frontend Tests (Node ${{ matrix.node-version }})
+    needs: code-quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [16, 18, 20]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Cache frontend node_modules
+        uses: actions/cache@v4
+        id: cache-frontend
+        with:
+          path: frontend/node_modules
+          key: frontend-${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            frontend-${{ runner.os }}-node${{ matrix.node-version }}-
+
+      - name: Install frontend dependencies
+        if: steps.cache-frontend.outputs.cache-hit != 'true'
+        working-directory: ./frontend
+        run: npm install --legacy-peer-deps --prefer-offline
+
+      - name: Run frontend tests
+        working-directory: ./frontend
+        run: npm run test:ci
+
+      - name: Upload JUnit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-frontend-node-${{ matrix.node-version }}
+          path: frontend/coverage/junit.xml
+          retention-days: 7
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-frontend-node-${{ matrix.node-version }}
+          path: |
+            frontend/coverage/
+            !frontend/coverage/junit.xml
+          retention-days: 7
+
+  # ─── BACKEND UNIT TESTS ───
+  test-backend:
+    name: Backend Tests (Node ${{ matrix.node-version }})
     needs: code-quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -146,59 +208,43 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
 
-      # ── Frontend Tests ──
-      - name: Cache frontend node_modules
-        uses: actions/cache@v4
-        id: cache-frontend-test
-        with:
-          path: frontend/node_modules
-          key: ${{ runner.os }}-frontend-${{ matrix.node-version }}-${{ hashFiles('frontend/package-lock.json') }}
-
-      - name: Install frontend dependencies
-        if: steps.cache-frontend-test.outputs.cache-hit != 'true'
-        working-directory: ./frontend
-        run: npm install --legacy-peer-deps --prefer-offline
-
-      - name: Run frontend tests with coverage
-        working-directory: ./frontend
-        run: npm run test:ci
-        continue-on-error: true
-
-      # ── Backend Tests ──
       - name: Cache backend node_modules
         uses: actions/cache@v4
-        id: cache-backend-test
+        id: cache-backend
         with:
           path: backend/node_modules
-          key: ${{ runner.os }}-backend-${{ matrix.node-version }}-${{ hashFiles('backend/package-lock.json') }}
+          key: backend-${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('backend/package-lock.json') }}
+          restore-keys: |
+            backend-${{ runner.os }}-node${{ matrix.node-version }}-
 
       - name: Install backend dependencies
-        if: steps.cache-backend-test.outputs.cache-hit != 'true'
+        if: steps.cache-backend.outputs.cache-hit != 'true'
         working-directory: ./backend
         run: npm install --prefer-offline
 
-      - name: Run backend tests with coverage
+      - name: Run backend tests
         working-directory: ./backend
         run: npm run test:ci
 
-      # ── Upload Coverage Artifacts ──
-      - name: Upload backend coverage
+      - name: Upload JUnit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-backend-node-${{ matrix.node-version }}
+          path: backend/coverage/junit.xml
+          retention-days: 7
+
+      - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-backend-node-${{ matrix.node-version }}
           path: |
             backend/coverage/
-          retention-days: 7
-
-      - name: Upload frontend coverage
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-frontend-node-${{ matrix.node-version }}
-          path: |
-            frontend/coverage/
+            !backend/coverage/junit.xml
           retention-days: 7
 
   # E2E TESTS (Playwright)
@@ -216,13 +262,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Cache frontend node_modules
         uses: actions/cache@v4
         id: cache-frontend-e2e
         with:
           path: frontend/node_modules
-          key: ${{ runner.os }}-frontend-e2e-${{ hashFiles('frontend/package-lock.json') }}
+          key: frontend-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            frontend-${{ runner.os }}-node20-
 
       - name: Install frontend dependencies
         if: steps.cache-frontend-e2e.outputs.cache-hit != 'true'
@@ -260,6 +310,14 @@ jobs:
           path: |
             frontend/playwright-report/
             frontend/test-results/
+          retention-days: 7
+
+      - name: Upload E2E JUnit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-e2e
+          path: frontend/test-results/junit.xml
           retention-days: 7
 
       - name: Upload E2E screenshots (on failure)
@@ -318,7 +376,7 @@ jobs:
   # BUILD DOCKER IMAGES
   build:
     name: Build Docker Images
-    needs: [test, e2e, performance]
+    needs: [test-frontend, test-backend, e2e, performance]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -358,7 +416,7 @@ jobs:
   # TEST SUMMARY REPORT
   report:
     name: Generate Test Summary
-    needs: [test, e2e, performance]
+    needs: [test-frontend, test-backend, e2e, performance]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -372,7 +430,29 @@ jobs:
         with:
           node-version: '20'
 
-      # Download all artifacts from previous jobs
+      # Download JUnit XMLs for merging and publishing
+      - name: Download frontend JUnit (Node 20)
+        uses: actions/download-artifact@v4
+        with:
+          name: junit-frontend-node-20
+          path: test-results/junit/
+        continue-on-error: true
+
+      - name: Download backend JUnit (Node 20)
+        uses: actions/download-artifact@v4
+        with:
+          name: junit-backend-node-20
+          path: test-results/junit/
+        continue-on-error: true
+
+      - name: Download E2E JUnit
+        uses: actions/download-artifact@v4
+        with:
+          name: junit-e2e
+          path: test-results/junit/
+        continue-on-error: true
+
+      # Download coverage for summary
       - name: Download backend coverage (Node 20)
         uses: actions/download-artifact@v4
         with:
@@ -403,6 +483,14 @@ jobs:
 
       - name: Generate test summary report
         run: node scripts/generate-summary.js
+
+      # Publish merged JUnit results to GitHub Actions UI
+      - name: Publish unit test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          junit_files: "test-results/junit/*.xml"
+          comment_mode: off
 
       - name: Upload test summary
         uses: actions/upload-artifact@v4
@@ -435,7 +523,7 @@ jobs:
   # NOTIFY
   notify:
     name: Notify Status
-    needs: [code-quality, test, e2e, performance, build, report]
+    needs: [code-quality, test-frontend, test-backend, e2e, performance, build, report]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
