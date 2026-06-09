@@ -119,14 +119,14 @@ export default [
     },
   },
 
-  // ── 6) Frontend Tests (CommonJS + Jest) ──
+  // ── 6) Frontend Tests (ES Module + Jest) ──
   {
     files: ['frontend/__tests__/**/*.{js,ts}'],
     languageOptions: {
       ecmaVersion: 'latest',
-      sourceType: 'commonjs',
+      sourceType: 'module',
       globals: {
-        ...globals.node,
+        ...globals.browser,
         ...globals.jest,
       },
     },
