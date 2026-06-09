@@ -7,6 +7,11 @@ on:
     branches: [ main, development ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 env:
   DOCKER_BUILDKIT: 1
   COMPOSE_DOCKER_CLI_BUILD: 1
@@ -489,7 +494,7 @@ jobs:
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
-          junit_files: "test-results/junit/*.xml"
+          files: "test-results/junit/*.xml"
           comment_mode: off
 
       - name: Upload test summary
