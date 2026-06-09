@@ -1,8 +1,0 @@
-node_modules/
-.next/
-coverage/
-playwright-report/
-test-results/
-public/
-e2e/
-__tests__/

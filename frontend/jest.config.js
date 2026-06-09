@@ -36,5 +36,8 @@ module.exports = {
     '\\.(gif|ttf|eot|svg|png|jpg|jpeg)$': '<rootDir>/__tests__/__mocks__/fileMock.js',
   },
 
-  setupFilesAfterSetup: [],
+  setupFilesAfterEnv: ['@testing-library/jest-dom'],
+  transform: {
+    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest']
+  },
 };
