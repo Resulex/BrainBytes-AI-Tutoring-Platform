@@ -18,7 +18,7 @@ function AuthConsumer() {
       <button
         data-testid="login-btn"
         onClick={async () => {
-          try { await auth.login('test@test.com', 'password'); } catch (e) { /* expected */ }
+          try { await auth.login('test@test.com', 'password'); } catch { /* expected */ }
         }}
       >
         Login
@@ -26,7 +26,7 @@ function AuthConsumer() {
       <button
         data-testid="register-btn"
         onClick={async () => {
-          try { await auth.register('Test', 'test@test.com', 'password', []); } catch (e) { /* expected */ }
+          try { await auth.register('Test', 'test@test.com', 'password', []); } catch { /* expected */ }
         }}
       >
         Register
