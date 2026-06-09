@@ -18,7 +18,11 @@ function AuthConsumer() {
       <button
         data-testid="login-btn"
         onClick={async () => {
-          try { await auth.login('test@test.com', 'password'); } catch { /* expected */ }
+          try {
+            await auth.login('test@test.com', 'password');
+          } catch {
+            /* expected */
+          }
         }}
       >
         Login
@@ -26,7 +30,11 @@ function AuthConsumer() {
       <button
         data-testid="register-btn"
         onClick={async () => {
-          try { await auth.register('Test', 'test@test.com', 'password', []); } catch { /* expected */ }
+          try {
+            await auth.register('Test', 'test@test.com', 'password', []);
+          } catch {
+            /* expected */
+          }
         }}
       >
         Register
@@ -34,7 +42,10 @@ function AuthConsumer() {
       <button data-testid="logout-btn" onClick={auth.logout}>
         Logout
       </button>
-      <button data-testid="update-btn" onClick={() => auth.updateUser({ name: 'Updated', email: 'updated@test.com' })}>
+      <button
+        data-testid="update-btn"
+        onClick={() => auth.updateUser({ name: 'Updated', email: 'updated@test.com' })}
+      >
         Update
       </button>
     </div>
@@ -153,10 +164,10 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('authenticated').textContent).toBe('true');
       });
 
-      expect(axios.post).toHaveBeenCalledWith(
-        expect.stringContaining('/api/auth/login'),
-        { email: 'test@test.com', password: 'password' },
-      );
+      expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/api/auth/login'), {
+        email: 'test@test.com',
+        password: 'password',
+      });
       expect(screen.getByTestId('username').textContent).toBe('TestUser');
       expect(localStorage.getItem('brainbytes_token')).toBe(token);
       expect(localStorage.getItem('brainbytes_user')).toBe(JSON.stringify(userData));
@@ -200,15 +211,12 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('authenticated').textContent).toBe('true');
       });
 
-      expect(axios.post).toHaveBeenCalledWith(
-        expect.stringContaining('/api/auth/register'),
-        {
-          name: 'Test',
-          email: 'test@test.com',
-          password: 'password',
-          preferredSubjects: [],
-        },
-      );
+      expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/api/auth/register'), {
+        name: 'Test',
+        email: 'test@test.com',
+        password: 'password',
+        preferredSubjects: [],
+      });
       expect(screen.getByTestId('username').textContent).toBe('NewUser');
       expect(localStorage.getItem('brainbytes_token')).toBe(token);
     });
@@ -257,7 +265,10 @@ describe('AuthContext', () => {
   describe('updateUser', () => {
     test('updates user in state and localStorage', async () => {
       localStorage.setItem('brainbytes_token', 'token');
-      localStorage.setItem('brainbytes_user', JSON.stringify({ name: 'Old', email: 'old@test.com' }));
+      localStorage.setItem(
+        'brainbytes_user',
+        JSON.stringify({ name: 'Old', email: 'old@test.com' }),
+      );
       axios.get.mockResolvedValueOnce({ data: { user: { name: 'Old', email: 'old@test.com' } } });
 
       renderWithProvider(<AuthConsumer />);
