@@ -27,7 +27,7 @@ const collectionOnly = args.includes('--collection')
 
 function parseMongoUri(uri) {
   // Parse mongodb://host:port/database or mongodb://user:pass@host:port/database
-  const match = uri.match(/mongodb:\/\/(?:[^@]+@)?([^\/]+)\/([^?]+)/);
+  const match = uri.match(/mongodb:\/\/(?:[^@]+@)?([^/]+)\/([^?]+)/);
   if (!match) {
     throw new Error(`Cannot parse MongoDB URI: ${uri}`);
   }

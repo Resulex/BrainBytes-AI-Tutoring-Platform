@@ -49,20 +49,10 @@ async function generateResponse(question, preferredSubject = null, _context = nu
   const isFrustrated = frustrationKeywords.some((k) => lowerQuestion.includes(k));
 
   // Determine the category based on keyword matching
-  let category = 'general';
-  if (isMath) {
-    category = 'math';
-  }
-  if (isHistory) {
-    category = 'history';
-  }
-  if (isScience) {
-    category = 'science';
-  }
+  let category;
   if (preferredSubject && ['math', 'science', 'history', 'general'].includes(preferredSubject)) {
     category = preferredSubject;
-  } else {
-    if (
+  } else if (
       lowerQuestion.includes('math') ||
       lowerQuestion.includes('algebra') ||
       lowerQuestion.includes('calculus')
@@ -83,7 +73,6 @@ async function generateResponse(question, preferredSubject = null, _context = nu
     } else {
       category = 'general';
     }
-  }
 
   if (isFrustrated) {
     console.log('User may be frustrated. Providing empathetic response.');
