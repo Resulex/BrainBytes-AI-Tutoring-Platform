@@ -295,7 +295,11 @@ describe('validators', () => {
     });
 
     test('accepts valid difficulty values', () => {
-      const base = { subject: 'Math', topic: 'Algebra', content: 'Valid content with enough chars' };
+      const base = {
+        subject: 'Math',
+        topic: 'Algebra',
+        content: 'Valid content with enough chars',
+      };
       expect(validators.learningMaterial({ ...base, difficulty: 'beginner' })).toHaveLength(0);
       expect(validators.learningMaterial({ ...base, difficulty: 'intermediate' })).toHaveLength(0);
       expect(validators.learningMaterial({ ...base, difficulty: 'advanced' })).toHaveLength(0);
