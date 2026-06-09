@@ -1,4 +1,4 @@
-name: BrainBytes CI
+name: BrainBytes CI Test
 
 on:
   push:
@@ -19,21 +19,19 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Install root dependencies (for eslint.config.mjs)
+        run: npm install --legacy-peer-deps
+
       - name: Install frontend dependencies
         working-directory: ./frontend
         run: npm install --legacy-peer-deps
 
       - name: Install backend dependencies
         working-directory: ./backend
-        run: npm install --prefer-offline
+        run: npm install
 
-      - name: Run frontend lint
-        working-directory: ./frontend
-        run: npm run lint
-
-      - name: Run backend lint
-        working-directory: ./backend
-        run: npm run lint
+      - name: Run lint
+        run: npx eslint frontend/ backend/
 
       - name: Run frontend tests
         working-directory: ./frontend
