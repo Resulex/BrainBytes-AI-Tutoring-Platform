@@ -30,7 +30,7 @@ env:
   COMPOSE_DOCKER_CLI_BUILD: 1
 
 jobs:
-  # ── Determine which environment to deploy to ───────────────────────────────
+  # ── Determine which environment to deploy to ──
   set-environment:
     name: Set Deployment Environment
     runs-on: ubuntu-latest
@@ -51,7 +51,7 @@ jobs:
       - name: Print environment
         run: echo "Deploying to ${{ steps.set-env.outputs.environment }}"
 
-  # ── Build & Push Docker Images ─────────────────────────────────────────────
+  # ── Build & Push Docker Images ───
   build-and-push:
     name: Build & Push (${{ needs.set-environment.outputs.environment }})
     needs: set-environment
@@ -114,7 +114,41 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── Deploy to Target Host ──────────────────────────────────────────────────
+  # ── Deploy to Railway.app ────
+  deploy-railway:
+    name: Deploy Railway (${{ needs.set-environment.outputs.environment }})
+    needs: [set-environment, build-and-push]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.set-environment.outputs.environment }}
+    timeout-minutes: 15
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+    steps:
+      - name: Check out repository
+        if: env.RAILWAY_TOKEN != ''
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        if: env.RAILWAY_TOKEN != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Railway CLI
+        if: env.RAILWAY_TOKEN != ''
+        run: npm install -g @railway/cli
+
+      - name: Deploy backend to Railway
+        if: env.RAILWAY_TOKEN != ''
+        run: railway up --service=backend
+
+      - name: Deploy frontend to Railway
+        if: env.RAILWAY_TOKEN != ''
+        run: railway up --service=frontend
+
+  # ── Deploy to Target Host ────
   deploy:
     name: Deploy (${{ needs.set-environment.outputs.environment }})
     needs: [set-environment, build-and-push]
@@ -192,7 +226,7 @@ jobs:
 
             echo "=== Deployment complete ==="
 
-  # ── Verify Deployment ──────────────────────────────────────────────────────
+  # ── Verify Deployment ──
   verify:
     name: Verify (${{ needs.set-environment.outputs.environment }})
     needs: [set-environment, deploy]
@@ -247,10 +281,10 @@ jobs:
           echo "| Branch | ${{ github.ref_name }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Status | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
 
-  # ── Notify ─────────────────────────────────────────────────────────────────
+  # ── Notify ──
   notify:
     name: Notify (${{ needs.set-environment.outputs.environment }})
-    needs: [set-environment, deploy, verify]
+    needs: [set-environment, deploy, deploy-railway, verify]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -278,7 +312,8 @@ jobs:
             | Commit      | `${{ github.sha }}`                      |
             | Environment | ${{ needs.set-environment.outputs.environment }} |
             | Build       | ${{ needs.build-and-push.result }}        |
-            | Deploy      | ${{ needs.deploy.result }}                |
+            | Deploy (SSH)| ${{ needs.deploy.result }}                |
+            | Deploy (Railway) | ${{ needs.deploy-railway.result }}     |
             | Verify      | ${{ needs.verify.result }}                |
             | Triggered by| ${{ github.actor }}                      |
 
