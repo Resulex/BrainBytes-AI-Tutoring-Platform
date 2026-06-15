@@ -290,7 +290,8 @@ jobs:
 
       - name: Start services with Docker Compose
         run: |
-          docker compose -f docker-compose.yml up -d --build
+          docker compose -f docker-compose.yml build --no-cache
+          docker compose -f docker-compose.yml up -d
           echo "Waiting for services to become healthy..."
           sleep 20
           docker compose ps
@@ -354,7 +355,8 @@ jobs:
 
       - name: Start services with Docker Compose
         run: |
-          docker compose -f docker-compose.yml up -d --build
+          docker compose -f docker-compose.yml build --no-cache
+          docker compose -f docker-compose.yml up -d
           echo "Waiting for services to become healthy..."
           sleep 20
           docker compose ps
@@ -412,7 +414,8 @@ jobs:
 
       - name: Test Docker Compose composition
         run: |
-          docker compose -f docker-compose.yml up -d --build
+          docker compose -f docker-compose.yml build --no-cache
+          docker compose -f docker-compose.yml up -d
           sleep 20
           docker compose ps
           bash test-composition.sh || echo "::warning::Composition test had issues"

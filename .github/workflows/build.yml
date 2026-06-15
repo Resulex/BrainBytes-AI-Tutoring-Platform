@@ -53,10 +53,11 @@ jobs:
           sudo chmod +x /usr/local/bin/docker-compose
           docker-compose --version
 
-      # 6. Test Docker Compose (always rebuild to use latest code)
+      # 6. Test Docker Compose (force clean build, bypass stale cache)
       - name: Test Docker Compose
         run: |
-          docker-compose -f docker-compose.yml up -d --build
+          docker-compose -f docker-compose.yml build --no-cache
+          docker-compose -f docker-compose.yml up -d
           sleep 20
           docker-compose ps
           docker-compose down
