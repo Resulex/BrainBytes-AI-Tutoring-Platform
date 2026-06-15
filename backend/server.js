@@ -373,4 +373,3 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Server started earlier (see line ~175) so health check is available immediately
-
