@@ -3,6 +3,8 @@
  * Provides consistent error responses across all API endpoints.
  */
 
+const logger = require('../utils/logger');
+
 // Custom application error class
 class AppError extends Error {
   constructor(message, statusCode = 500, details = null) {
@@ -40,13 +42,18 @@ function handleJWTExpiredError() {
 
 // Main error handling middleware
 function errorHandler(err, req, res, _next) {
-  // Log the error
-  console.error(`[${new Date().toISOString()}] Error:`, {
-    message: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-    path: req.originalUrl,
-    method: req.method,
-  });
+  // Structured log
+  logger.error(
+    {
+      message: err.message,
+      stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined,
+      path: req.originalUrl,
+      method: req.method,
+      statusCode: err.statusCode || err.status,
+      errorName: err.name,
+    },
+    'Unhandled error',
+  );
 
   // Default to 500
   let error = { ...err };
