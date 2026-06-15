@@ -18,6 +18,20 @@ const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { authenticate } = require('./middleware/auth');
 const logger = require('./utils/logger');
 
+// ── Global crash handlers ──
+// Prevent the process from dying on uncaught exceptions / unhandled rejections
+// so the health check can still respond. Crash details are logged for forensics.
+process.on('uncaughtException', (err) => {
+  logger.error({ err }, 'Uncaught exception — process will exit');
+  // Give logs time to flush, then exit so the orchestrator can restart
+  setTimeout(() => process.exit(1), 1000);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error({ err: reason }, 'Unhandled promise rejection');
+  // Don't exit — the rejection was caught by this handler
+});
+
 // Route imports
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
@@ -193,10 +207,20 @@ app.get('/ready', async (_req, res) => {
   }
 });
 
-// Initialize AI model
-aiService.initializeAI();
+// ── Start HTTP server EARLY (health check must respond quickly) ──
+// All remaining initialization happens after the server is listening
+server.listen(PORT, () => {
+  logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'Server listening');
+});
 
-// Connect to MongoDB
+// Initialize AI model in background (don't crash if it fails)
+try {
+  aiService.initializeAI();
+} catch (err) {
+  logger.error({ err }, 'AI model initialization failed');
+}
+
+// Connect to MongoDB in background (server is already up for health checks)
 mongoose
   .connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/brainbytes', {
     useNewUrlParser: true,
@@ -210,7 +234,7 @@ mongoose
     logger.error({ err }, 'Failed to connect to MongoDB');
   });
 
-// API Routes
+// ── API Routes (below health check, server already listening) ──
 app.get('/', (req, res) => {
   res.json({
     message: 'Welcome to the BrainBytes API',
@@ -348,7 +372,5 @@ setupSocketHandlers(io);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Start the server
-server.listen(PORT, () => {
-  logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'Server started');
-});
+// Server started earlier (see line ~175) so health check is available immediately
+
