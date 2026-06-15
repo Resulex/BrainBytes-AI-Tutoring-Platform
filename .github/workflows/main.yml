@@ -398,8 +398,8 @@ jobs:
           context: ./frontend
           push: false
           tags: brainbytes/frontend:latest
-          cache-from: type=gha,scope=frontend
-          cache-to: type=gha,mode=max,scope=frontend
+          cache-from: type=gha,scope=frontend-v2
+          cache-to: type=gha,mode=max,scope=frontend-v2
 
       - name: Build backend image
         uses: docker/build-push-action@v5
@@ -407,13 +407,13 @@ jobs:
           context: ./backend
           push: false
           tags: brainbytes/backend:latest
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
+          cache-from: type=gha,scope=backend-v2
+          cache-to: type=gha,mode=max,scope=backend-v2
 
       - name: Test Docker Compose composition
         run: |
-          docker compose -f docker-compose.yml up -d
-          sleep 15
+          docker compose -f docker-compose.yml up -d --build
+          sleep 20
           docker compose ps
           bash test-composition.sh || echo "::warning::Composition test had issues"
           docker compose down

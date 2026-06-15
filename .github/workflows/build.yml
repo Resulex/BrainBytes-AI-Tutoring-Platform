@@ -29,8 +29,8 @@ jobs:
           context: ./frontend
           push: false
           tags: brainbytes/frontend:latest
-          cache-from: type=gha,scope=frontend
-          cache-to: type=gha,mode=max,scope=frontend
+          cache-from: type=gha,scope=frontend-v2
+          cache-to: type=gha,mode=max,scope=frontend-v2
         continue-on-error: true
 
       # 4. Build the backend image (docker/build-push-action v5)
@@ -40,8 +40,8 @@ jobs:
           context: ./backend
           push: false
           tags: brainbytes/backend:latest
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
+          cache-from: type=gha,scope=backend-v2
+          cache-to: type=gha,mode=max,scope=backend-v2
         continue-on-error: true
 
       # 5. (Optional) Install Docker Compose if the runner lacks it
@@ -53,9 +53,10 @@ jobs:
           sudo chmod +x /usr/local/bin/docker-compose
           docker-compose --version
 
-      # 6. Test Docker Compose
+      # 6. Test Docker Compose (always rebuild to use latest code)
       - name: Test Docker Compose
         run: |
-          docker-compose -f docker-compose.yml up -d
+          docker-compose -f docker-compose.yml up -d --build
+          sleep 20
           docker-compose ps
           docker-compose down

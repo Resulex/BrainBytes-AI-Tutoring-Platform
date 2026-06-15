@@ -1,5 +1,3 @@
-version: '3'
-
 # E2E testing override - extends docker-compose.yml for test environments
 services:
   frontend:
