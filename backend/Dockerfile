@@ -1,6 +1,6 @@
 # Multi-stage build for container optimization
 # Stage 1: Install production dependencies
-FROM node:18-alpine AS deps
+FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /usr/src/app
 COPY package*.json ./
@@ -8,7 +8,7 @@ RUN npm install --production && \
     npm cache clean --force
 
 # Stage 2: Production image
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /usr/src/app
 
 # Create non-root user for security
