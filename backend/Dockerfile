@@ -15,9 +15,6 @@ WORKDIR /usr/src/app
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 appuser
 
-# Install wget for Docker health check
-RUN apk add --no-cache wget
-
 # Copy only production dependencies from deps stage
 COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY . .
@@ -29,8 +26,8 @@ USER appuser
 
 EXPOSE 3000
 
-# Health check
+# Health check (uses built-in Node.js — no extra packages needed)
 HEALTHCHECK --interval=15s --timeout=10s --start-period=40s --retries=5 \
-  CMD wget -q -O /dev/null http://localhost:3000/health || exit 1
+  CMD node -e "require('http').get('http://localhost:3000/health',r=>{process.exit(r.statusCode===200?0:1)})"
 
 CMD ["node", "server.js"]

@@ -43,6 +43,62 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
+// ══════════════════════════════════════════════════════
+// Health check endpoints — MUST be registered FIRST,
+// before any middleware, so they always respond correctly
+// even if other middleware/startup fails.
+// ══════════════════════════════════════════════════════
+
+// Liveness probe — is the process running?
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Readiness probe — is the app ready to serve traffic?
+app.get('/ready', async (_req, res) => {
+  try {
+    const dbState = mongoose.connection.readyState;
+    const dbStatus = {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting',
+    };
+
+    if (dbState !== 1) {
+      logger.warn(
+        { dbState, dbStatus: dbStatus[dbState] },
+        'Readiness check failed — DB not connected',
+      );
+      return res.status(503).json({
+        status: 'not ready',
+        reason: `Database ${dbStatus[dbState] || 'unknown'}`,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    res.status(200).json({
+      status: 'ready',
+      database: 'connected',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.error({ err }, 'Readiness check error');
+    res.status(503).json({
+      status: 'not ready',
+      reason: 'Health check failed',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// ---- End of health check routes ----
+
 // Socket.io setup
 const io = new Server(server, {
   cors: {
@@ -156,55 +212,6 @@ app.use((req, res, next) => {
     }
   });
   next();
-});
-
-// ── Health check endpoints (used by Railway.app) ──
-// Liveness probe — is the process running?
-app.get('/health', (_req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// Readiness probe — is the app ready to serve traffic?
-app.get('/ready', async (_req, res) => {
-  try {
-    const dbState = mongoose.connection.readyState;
-    const dbStatus = {
-      0: 'disconnected',
-      1: 'connected',
-      2: 'connecting',
-      3: 'disconnecting',
-    };
-
-    if (dbState !== 1) {
-      logger.warn(
-        { dbState, dbStatus: dbStatus[dbState] },
-        'Readiness check failed — DB not connected',
-      );
-      return res.status(503).json({
-        status: 'not ready',
-        reason: `Database ${dbStatus[dbState] || 'unknown'}`,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    res.status(200).json({
-      status: 'ready',
-      database: 'connected',
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-    });
-  } catch (err) {
-    logger.error({ err }, 'Readiness check error');
-    res.status(503).json({
-      status: 'not ready',
-      reason: 'Health check failed',
-      timestamp: new Date().toISOString(),
-    });
-  }
 });
 
 // ── Start HTTP server EARLY (health check must respond quickly) ──

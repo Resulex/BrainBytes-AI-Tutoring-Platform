@@ -22,7 +22,13 @@ services:
           cpus: '0.1'
           memory: 128M
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/health"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1))",
+        ]
       interval: 15s
       timeout: 10s
       start_period: 40s
@@ -80,7 +86,7 @@ services:
           cpus: '0.2'
           memory: 256M
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongo --quiet
+      test: ["CMD-SHELL", "echo 'db.runCommand(\"ping\").ok' | mongo --quiet"]
       interval: 30s
       timeout: 10s
       start_period: 30s
