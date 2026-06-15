@@ -1,3 +1,11 @@
+const logger = require('../../utils/logger');
+
+jest.mock('../../utils/logger', () => ({
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+}));
+
 const {
   AppError,
   errorHandler,
@@ -43,11 +51,7 @@ describe('errorHandler', () => {
       json: jest.fn(),
     };
     next = jest.fn();
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    console.error.mockRestore();
+    jest.clearAllMocks();
   });
 
   test('handles generic Error with default 500', () => {
@@ -59,7 +63,7 @@ describe('errorHandler', () => {
     expect(res.json).toHaveBeenCalledWith({
       error: 'Something broke',
     });
-    expect(console.error).toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 
   test('handles AppError with custom status code', () => {
@@ -172,13 +176,13 @@ describe('errorHandler', () => {
 
     errorHandler(err, req, res, next);
 
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringMatching(/^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/),
+    expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         message: 'Log test',
         path: '/api/test',
         method: 'GET',
       }),
+      'Unhandled error',
     );
   });
 

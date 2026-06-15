@@ -40,16 +40,19 @@ const io = new Server(server, {
 // Security Middleware
 app.use(
   helmet({
-    contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-        imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'", process.env.CORS_ORIGIN].filter(Boolean),
-      },
-    } : false,
+    contentSecurityPolicy:
+      process.env.NODE_ENV === 'production'
+        ? {
+            directives: {
+              defaultSrc: ["'self'"],
+              scriptSrc: ["'self'", "'unsafe-inline'"],
+              styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+              fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+              imgSrc: ["'self'", 'data:', 'https:'],
+              connectSrc: ["'self'", process.env.CORS_ORIGIN].filter(Boolean),
+            },
+          }
+        : false,
     hsts: {
       maxAge: 31536000,
       includeSubDomains: true,
@@ -163,7 +166,10 @@ app.get('/ready', async (_req, res) => {
     };
 
     if (dbState !== 1) {
-      logger.warn({ dbState, dbStatus: dbStatus[dbState] }, 'Readiness check failed — DB not connected');
+      logger.warn(
+        { dbState, dbStatus: dbStatus[dbState] },
+        'Readiness check failed — DB not connected',
+      );
       return res.status(503).json({
         status: 'not ready',
         reason: `Database ${dbStatus[dbState] || 'unknown'}`,

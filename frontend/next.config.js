@@ -1,4 +1,13 @@
 module.exports = {
+  // Rewrite Railway health check to API route
+  async rewrites() {
+    return [
+      {
+        source: '/health',
+        destination: '/api/health',
+      },
+    ];
+  },
   // Enable PWA features
   headers: async () => [
     {
