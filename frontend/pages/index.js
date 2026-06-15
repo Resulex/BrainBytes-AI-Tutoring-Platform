@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import useSocket from '../hooks/useSocket';
 import { addToQueue, retryQueue, hasPendingMessages } from '../utils/offlineQueue';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-b328.up.railway.app';
 
 function LoginForm({ onLogin, onSwitch }) {
   const [email, setEmail] = useState('');

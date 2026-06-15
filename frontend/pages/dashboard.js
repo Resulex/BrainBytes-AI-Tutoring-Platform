@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Link from 'next/link';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-b328.up.railway.app';
 
 export default function Dashboard() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();

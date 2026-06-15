@@ -140,7 +140,7 @@ const allowedOrigins = [
   process.env.CORS_ORIGIN,
   'http://localhost:3000',
   'http://localhost:3001',
-  'https://frontend-production-383f.up.railway.app',
+  'https://brainbytesaitutor.up.railway.app',
 ].filter(Boolean);
 
 app.use(
