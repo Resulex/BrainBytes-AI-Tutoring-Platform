@@ -53,11 +53,20 @@ jobs:
           sudo chmod +x /usr/local/bin/docker-compose
           docker-compose --version
 
-      # 6. Test Docker Compose (force clean build, bypass stale cache)
+      # 6. Test Docker Compose
       - name: Test Docker Compose
         run: |
           docker-compose -f docker-compose.yml build --no-cache
-          docker-compose -f docker-compose.yml up -d
-          sleep 20
+          docker-compose -f docker-compose.yml up -d --wait --wait-timeout 120
           docker-compose ps
           docker-compose down
+
+      - name: Debug Docker containers (on failure)
+        if: failure()
+        run: |
+          echo "=== Container Status ==="
+          docker-compose -f docker-compose.yml ps -a
+          echo "=== Backend Logs ==="
+          docker-compose -f docker-compose.yml logs backend
+          echo "=== MongoDB Logs ==="
+          docker-compose -f docker-compose.yml logs mongo

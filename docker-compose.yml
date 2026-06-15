@@ -25,10 +25,10 @@ services:
           memory: 128M
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      start_period: 20s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
 
   # Backend API container
   backend:
@@ -57,10 +57,10 @@ services:
           memory: 256M
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      start_period: 15s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
 
   # MongoDB container
   mongo:

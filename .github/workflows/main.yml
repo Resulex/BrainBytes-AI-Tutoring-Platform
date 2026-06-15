@@ -291,10 +291,18 @@ jobs:
       - name: Start services with Docker Compose
         run: |
           docker compose -f docker-compose.yml build --no-cache
-          docker compose -f docker-compose.yml up -d
-          echo "Waiting for services to become healthy..."
-          sleep 20
+          docker compose -f docker-compose.yml up -d --wait --wait-timeout 120
           docker compose ps
+
+      - name: Debug Docker containers (on failure)
+        if: failure()
+        run: |
+          echo "=== Container Status ==="
+          docker compose ps -a
+          echo "=== Backend Logs ==="
+          docker compose logs backend
+          echo "=== MongoDB Logs ==="
+          docker compose logs mongo
 
       - name: Run Playwright E2E tests
         working-directory: ./frontend
@@ -356,10 +364,18 @@ jobs:
       - name: Start services with Docker Compose
         run: |
           docker compose -f docker-compose.yml build --no-cache
-          docker compose -f docker-compose.yml up -d
-          echo "Waiting for services to become healthy..."
-          sleep 20
+          docker compose -f docker-compose.yml up -d --wait --wait-timeout 120
           docker compose ps
+
+      - name: Debug Docker containers (on failure)
+        if: failure()
+        run: |
+          echo "=== Container Status ==="
+          docker compose ps -a
+          echo "=== Backend Logs ==="
+          docker compose logs backend
+          echo "=== MongoDB Logs ==="
+          docker compose logs mongo
 
       - name: Run k6 performance tests
         run: k6 run backend/tests/performance/api-load-test.js --summary-export=backend/tests/performance/summary.json
@@ -415,11 +431,20 @@ jobs:
       - name: Test Docker Compose composition
         run: |
           docker compose -f docker-compose.yml build --no-cache
-          docker compose -f docker-compose.yml up -d
-          sleep 20
+          docker compose -f docker-compose.yml up -d --wait --wait-timeout 120
           docker compose ps
           bash test-composition.sh || echo "::warning::Composition test had issues"
           docker compose down
+
+      - name: Debug Docker containers (on failure)
+        if: failure()
+        run: |
+          echo "=== Container Status ==="
+          docker compose ps -a
+          echo "=== Backend Logs ==="
+          docker compose logs backend
+          echo "=== MongoDB Logs ==="
+          docker compose logs mongo
 
   # TEST SUMMARY REPORT
   report:
