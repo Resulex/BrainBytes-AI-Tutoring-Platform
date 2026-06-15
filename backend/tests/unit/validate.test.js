@@ -1,3 +1,11 @@
+const logger = require('../../utils/logger');
+
+jest.mock('../../utils/logger', () => ({
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+}));
+
 const { validate, sanitize, sanitizeObject, validators } = require('../../middleware/validate');
 
 describe('validators', () => {
@@ -341,14 +349,15 @@ describe('validate middleware', () => {
     const req = { body: {} };
     const res = {};
     const next = jest.fn();
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const middleware = validate('nonexistent');
     middleware(req, res, next);
 
     expect(next).toHaveBeenCalled();
-    expect(consoleSpy).toHaveBeenCalledWith('Unknown validation schema: nonexistent');
-    consoleSpy.mockRestore();
+    expect(logger.warn).toHaveBeenCalledWith(
+      { schemaName: 'nonexistent' },
+      'Unknown validation schema requested',
+    );
   });
 });
 
