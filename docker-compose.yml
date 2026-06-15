@@ -7,8 +7,6 @@ services:
         - NEXT_PUBLIC_API_URL=http://localhost:3000
     ports:
       - "8080:3000"
-    volumes:
-      - /usr/src/app/node_modules
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:3000
     depends_on:
@@ -35,9 +33,6 @@ services:
     build: ./backend
     ports:
       - "3000:3000"
-    volumes:
-      - ./backend:/usr/src/app
-      - /usr/src/app/node_modules
     environment:
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
       - JWT_SECRET=${JWT_SECRET:-brainbytes-dev-secret-key-change-in-production}
