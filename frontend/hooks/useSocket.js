@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-b328.up.railway.app';
+const SOCKET_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-b328.up.railway.app';
 
 export default function useSocket(sessionId) {
   const { token } = useAuth();
