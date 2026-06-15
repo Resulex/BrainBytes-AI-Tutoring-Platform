@@ -45,7 +45,7 @@ USER nextjs
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=10s --start-period=40s --retries=5 \
   CMD wget -q -O /dev/null http://localhost:3000/health || exit 1
 
 CMD ["npm", "start"]

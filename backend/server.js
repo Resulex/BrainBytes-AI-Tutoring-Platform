@@ -18,6 +18,20 @@ const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { authenticate } = require('./middleware/auth');
 const logger = require('./utils/logger');
 
+// ── Global crash handlers ──
+// Prevent the process from dying on uncaught exceptions / unhandled rejections
+// so the health check can still respond. Crash details are logged for forensics.
+process.on('uncaughtException', (err) => {
+  logger.error({ err }, 'Uncaught exception — process will exit');
+  // Give logs time to flush, then exit so the orchestrator can restart
+  setTimeout(() => process.exit(1), 1000);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error({ err: reason }, 'Unhandled promise rejection');
+  // Don't exit — the rejection was caught by this handler
+});
+
 // Route imports
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
@@ -28,6 +42,62 @@ const preferenceRoutes = require('./routes/preferences');
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
+
+// ══════════════════════════════════════════════════════
+// Health check endpoints — MUST be registered FIRST,
+// before any middleware, so they always respond correctly
+// even if other middleware/startup fails.
+// ══════════════════════════════════════════════════════
+
+// Liveness probe — is the process running?
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Readiness probe — is the app ready to serve traffic?
+app.get('/ready', async (_req, res) => {
+  try {
+    const dbState = mongoose.connection.readyState;
+    const dbStatus = {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting',
+    };
+
+    if (dbState !== 1) {
+      logger.warn(
+        { dbState, dbStatus: dbStatus[dbState] },
+        'Readiness check failed — DB not connected',
+      );
+      return res.status(503).json({
+        status: 'not ready',
+        reason: `Database ${dbStatus[dbState] || 'unknown'}`,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    res.status(200).json({
+      status: 'ready',
+      database: 'connected',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.error({ err }, 'Readiness check error');
+    res.status(503).json({
+      status: 'not ready',
+      reason: 'Health check failed',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// ---- End of health check routes ----
 
 // Socket.io setup
 const io = new Server(server, {
@@ -144,59 +214,20 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── Health check endpoints (used by Railway.app) ──
-// Liveness probe — is the process running?
-app.get('/health', (_req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-  });
+// ── Start HTTP server EARLY (health check must respond quickly) ──
+// All remaining initialization happens after the server is listening
+server.listen(PORT, () => {
+  logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'Server listening');
 });
 
-// Readiness probe — is the app ready to serve traffic?
-app.get('/ready', async (_req, res) => {
-  try {
-    const dbState = mongoose.connection.readyState;
-    const dbStatus = {
-      0: 'disconnected',
-      1: 'connected',
-      2: 'connecting',
-      3: 'disconnecting',
-    };
+// Initialize AI model in background (don't crash if it fails)
+try {
+  aiService.initializeAI();
+} catch (err) {
+  logger.error({ err }, 'AI model initialization failed');
+}
 
-    if (dbState !== 1) {
-      logger.warn(
-        { dbState, dbStatus: dbStatus[dbState] },
-        'Readiness check failed — DB not connected',
-      );
-      return res.status(503).json({
-        status: 'not ready',
-        reason: `Database ${dbStatus[dbState] || 'unknown'}`,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    res.status(200).json({
-      status: 'ready',
-      database: 'connected',
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-    });
-  } catch (err) {
-    logger.error({ err }, 'Readiness check error');
-    res.status(503).json({
-      status: 'not ready',
-      reason: 'Health check failed',
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
-
-// Initialize AI model
-aiService.initializeAI();
-
-// Connect to MongoDB
+// Connect to MongoDB in background (server is already up for health checks)
 mongoose
   .connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/brainbytes', {
     useNewUrlParser: true,
@@ -210,7 +241,7 @@ mongoose
     logger.error({ err }, 'Failed to connect to MongoDB');
   });
 
-// API Routes
+// ── API Routes (below health check, server already listening) ──
 app.get('/', (req, res) => {
   res.json({
     message: 'Welcome to the BrainBytes API',
@@ -348,7 +379,4 @@ setupSocketHandlers(io);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Start the server
-server.listen(PORT, () => {
-  logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'Server started');
-});
+// Server started earlier (see line ~175) so health check is available immediately
