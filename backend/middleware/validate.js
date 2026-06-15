@@ -3,6 +3,8 @@
  * Provides schema-based validation for request bodies.
  */
 
+const logger = require('../utils/logger');
+
 // Validation rules
 const validators = {
   // Auth
@@ -126,7 +128,7 @@ function validate(schemaName) {
   return (req, res, next) => {
     const validator = validators[schemaName];
     if (!validator) {
-      console.error(`Unknown validation schema: ${schemaName}`);
+      logger.warn({ schemaName }, 'Unknown validation schema requested');
       return next();
     }
 

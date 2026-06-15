@@ -16,6 +16,7 @@ const { cacheMiddleware, cache } = require('./utils/cache');
 const { validate } = require('./middleware/validate');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { authenticate } = require('./middleware/auth');
+const logger = require('./utils/logger');
 
 // Route imports
 const authRoutes = require('./routes/auth');
@@ -37,15 +38,51 @@ const io = new Server(server, {
 });
 
 // Security Middleware
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'", process.env.CORS_ORIGIN].filter(Boolean),
+      },
+    } : false,
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    noSniff: true,
+    xssFilter: true,
+    hidePoweredBy: true,
+  }),
+);
 app.use(mongoSanitize());
 
-// CORS configuration
+// CORS configuration with whitelist
+const allowedOrigins = [
+  process.env.CORS_ORIGIN,
+  'http://localhost:3000',
+  'http://localhost:3001',
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (server-to-server, mobile apps, curl)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 86400,
   }),
 );
 
@@ -74,21 +111,97 @@ const authLimiter = rateLimit({
 app.use('/api/', globalLimiter);
 app.use('/api/auth/', authLimiter);
 
+// ── Request logging middleware ──
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const logData = {
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      duration,
+      ip: req.ip,
+    };
+
+    // Set response time header
+    res.setHeader('X-Response-Time', `${duration}ms`);
+
+    // Log level based on status code
+    if (res.statusCode >= 500) {
+      logger.error(logData, 'Request error');
+    } else if (res.statusCode >= 400) {
+      logger.warn(logData, 'Request client error');
+    } else if (duration > 1000) {
+      logger.warn({ ...logData, threshold: '1s' }, 'Slow request');
+    } else {
+      logger.info(logData, 'Request completed');
+    }
+  });
+  next();
+});
+
+// ── Health check endpoints (used by Railway.app) ──
+// Liveness probe — is the process running?
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Readiness probe — is the app ready to serve traffic?
+app.get('/ready', async (_req, res) => {
+  try {
+    const dbState = mongoose.connection.readyState;
+    const dbStatus = {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting',
+    };
+
+    if (dbState !== 1) {
+      logger.warn({ dbState, dbStatus: dbStatus[dbState] }, 'Readiness check failed — DB not connected');
+      return res.status(503).json({
+        status: 'not ready',
+        reason: `Database ${dbStatus[dbState] || 'unknown'}`,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    res.status(200).json({
+      status: 'ready',
+      database: 'connected',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.error({ err }, 'Readiness check error');
+    res.status(503).json({
+      status: 'not ready',
+      reason: 'Health check failed',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 // Initialize AI model
 aiService.initializeAI();
 
 // Connect to MongoDB
 mongoose
-  .connect('mongodb://mongo:27017/brainbytes', {
+  .connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/brainbytes', {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     retryWrites: true,
   })
   .then(() => {
-    console.log('Connected to MongoDB');
+    logger.info('Connected to MongoDB');
   })
   .catch((err) => {
-    console.error('Failed to connect to MongoDB:', err);
+    logger.error({ err }, 'Failed to connect to MongoDB');
   });
 
 // API Routes
@@ -185,7 +298,7 @@ app.post('/api/messages', validate('message'), async (req, res, next) => {
     const aiResult = await aiService
       .generateResponse(sanitizedText, subject, context)
       .catch((error) => {
-        console.error('AI response failed:', error);
+        logger.error({ error, message: sanitizedText }, 'AI response failed');
         return {
           category: 'error',
           response:
@@ -231,5 +344,5 @@ app.use(errorHandler);
 
 // Start the server
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'Server started');
 });
