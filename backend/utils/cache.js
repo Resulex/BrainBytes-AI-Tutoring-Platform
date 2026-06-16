@@ -93,7 +93,10 @@ function cacheMiddleware(durationSeconds = 300) {
     // Store original res.json to intercept
     const originalJson = res.json.bind(res);
     res.json = (body) => {
-      cache.set(key, body, durationSeconds * 1000);
+      // Only cache successful responses (2xx)
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        cache.set(key, body, durationSeconds * 1000);
+      }
       originalJson(body);
     };
 
