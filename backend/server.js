@@ -43,6 +43,10 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
+// Trust the Railway load balancer proxy so express-rate-limit
+// correctly identifies real client IPs from X-Forwarded-For
+app.set('trust proxy', 1);
+
 // ══════════════════════════════════════════════════════
 // Health check endpoints — MUST be registered FIRST,
 // before any middleware, so they always respond correctly
@@ -231,9 +235,8 @@ try {
 // Connect to MongoDB in background (server is already up for health checks)
 mongoose
   .connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/brainbytes', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
     retryWrites: true,
+    useCreateIndex: true,
   })
   .then(() => {
     logger.info('Connected to MongoDB');
