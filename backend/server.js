@@ -192,6 +192,33 @@ app.use('/api/auth/', authLimiter);
 // ── Request logging middleware ──
 app.use((req, res, next) => {
   const start = Date.now();
+  let responseTimeSet = false;
+
+  // Set X-Response-Time header BEFORE the response is sent (not in 'finish')
+  const addResponseTimeHeader = () => {
+    if (responseTimeSet) return;
+    responseTimeSet = true;
+    const duration = Date.now() - start;
+    if (!res.headersSent) {
+      res.setHeader('X-Response-Time', `${duration}ms`);
+    }
+  };
+
+  // Intercept res.json to set the timing header before data is written
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    addResponseTimeHeader();
+    return originalJson(body);
+  };
+
+  // Intercept res.send (fallback for non-JSON responses)
+  const originalSend = res.send.bind(res);
+  res.send = (body) => {
+    addResponseTimeHeader();
+    return originalSend(body);
+  };
+
+  // Log after the response finishes (no header manipulation here)
   res.on('finish', () => {
     const duration = Date.now() - start;
     const logData = {
@@ -201,9 +228,6 @@ app.use((req, res, next) => {
       duration,
       ip: req.ip,
     };
-
-    // Set response time header
-    res.setHeader('X-Response-Time', `${duration}ms`);
 
     // Log level based on status code
     if (res.statusCode >= 500) {
@@ -216,6 +240,12 @@ app.use((req, res, next) => {
       logger.info(logData, 'Request completed');
     }
   });
+
+  // Prevent EventEmitter errors (e.g. from aborted connections) from crashing the process
+  res.on('error', (err) => {
+    logger.error({ err, method: req.method, path: req.originalUrl }, 'Response stream error');
+  });
+
   next();
 });
 
@@ -236,7 +266,8 @@ try {
 mongoose
   .connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/brainbytes', {
     retryWrites: true,
-    useCreateIndex: true,
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
   })
   .then(() => {
     logger.info('Connected to MongoDB');
@@ -323,9 +354,14 @@ app.post('/api/messages', validate('message'), async (req, res, next) => {
     });
     await userMessage.save();
 
-    // Invalidate cache for this session's messages
+    // Invalidate all cached message queries for this session
     if (sessionId) {
-      cache.del(`__cache__/api/messages?sessionId=${sessionId}`);
+      const prefix = `__cache__/api/messages?sessionId=${sessionId}`;
+      for (const key of cache.cache.keys()) {
+        if (key.startsWith(prefix)) {
+          cache.del(key);
+        }
+      }
     }
 
     // Gather context if session ID provided
