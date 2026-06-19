@@ -19,6 +19,9 @@ Status](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workf
 [![Deploy
 Status](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/deploy.yml/badge.svg)](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/deploy.yml)
 
+## Cloud Deployment Link
+https://brainbytesaitutor.up.railway.app/
+
 ## Project Overview
 BrainBytes is an AI-powered tutoring platform designed to provide accessible academic assistance to Filipino students. This project implements the platform using modern DevOps practices and containerization.
 
@@ -513,3 +516,6 @@ Docker version 29.4.1, build 055a478
 - [Task Distribution Plan](https://docs.google.com/spreadsheets/d/1e3JSPDEwzf6VswULflVIxrk0AFxl5QTjwNTdBPtG3K0/edit?usp=sharing)
 - [MS1 Documentation](https://docs.google.com/document/d/1os4GjEnvPh2NJy3gVD3GweAF0FtgzfEw44r5U_Jr198/edit?usp=sharing)
 - [Project Demo Video](https://drive.google.com/file/d/1i2-2BdyJ_BdnI3FpEa1sVns4dLYddgXv/view?usp=sharing)
+- [CI/CD Implementation and Testing Documentation](https://docs.google.com/document/d/15Xo--sSDzwhhLpeyZmdhPw-qLuAiU1n-eYFgr0FbFkY/edit?usp=sharing)
+- [Deployment Plan Documentation](https://docs.google.com/document/d/15uaHOPKM--08Mhd5ZjJibSCVzGSw3QeDIC_z69zGdeM/edit?usp=sharing)
+- [Milestone 2 Documentation](https://docs.google.com/document/d/1JGmgXinJhcwiIrOKrD6c6GpZu-I6txaua_B3yKzxFrA/edit?usp=sharing)
