@@ -519,3 +519,5 @@ Docker version 29.4.1, build 055a478
 - [CI/CD Implementation and Testing Documentation](https://docs.google.com/document/d/15Xo--sSDzwhhLpeyZmdhPw-qLuAiU1n-eYFgr0FbFkY/edit?usp=sharing)
 - [Deployment Plan Documentation](https://docs.google.com/document/d/15uaHOPKM--08Mhd5ZjJibSCVzGSw3QeDIC_z69zGdeM/edit?usp=sharing)
 - [Milestone 2 Documentation](https://docs.google.com/document/d/1JGmgXinJhcwiIrOKrD6c6GpZu-I6txaua_B3yKzxFrA/edit?usp=sharing)
+- [System Architecture Documentation](https://docs.google.com/document/d/1g6Mlpc_S-m_Z2aj1wN1TN-1YaPxlycXyg-laoY-M8b8/edit?usp=sharing)
+- [CI/CD Pipeline Validation Report](https://docs.google.com/document/d/12j39USQ9-Qj1diSLB_EDyHGhtwUMgEW0TN5G342KssE/edit?usp=sharing)
