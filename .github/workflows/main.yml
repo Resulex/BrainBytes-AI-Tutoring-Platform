@@ -466,6 +466,7 @@ jobs:
         with:
           context: ./frontend
           push: false
+          load: true
           tags: brainbytes/frontend:latest
           cache-from: type=gha,scope=frontend-v2
           cache-to: type=gha,mode=max,scope=frontend-v2
@@ -475,6 +476,7 @@ jobs:
         with:
           context: ./backend
           push: false
+          load: true
           tags: brainbytes/backend:latest
           cache-from: type=gha,scope=backend-v2
           cache-to: type=gha,mode=max,scope=backend-v2
@@ -492,7 +494,7 @@ jobs:
 
       - name: Upload frontend scan results
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-frontend.sarif
           category: trivy-frontend
@@ -509,7 +511,7 @@ jobs:
 
       - name: Upload backend scan results
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-backend.sarif
           category: trivy-backend
