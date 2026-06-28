@@ -23,6 +23,7 @@ services:
       backend:
         condition: service_healthy
     environment:
+      - CI=true
       - BASE_URL=http://frontend:3000
       - BACKEND_URL=http://backend:3000
     volumes:
