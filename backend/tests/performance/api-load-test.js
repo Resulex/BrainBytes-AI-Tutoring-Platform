@@ -1,12 +1,12 @@
 // k6 performance test suite for BrainBytes backend API
 import http from 'k6/http';
-import { check, sleep, group, trend } from 'k6';
-import { Rate, Counter } from 'k6/metrics';
+import { check, sleep, group } from 'k6';
+import { Rate, Counter, Trend } from 'k6/metrics';
 
 // Custom metrics
 const errorRate = new Rate('errors');
 const authRequests = new Counter('auth_requests');
-const apiRequestDuration = new trend('api_request_duration', true);
+const apiRequestDuration = new Trend('api_request_duration', true);
 
 // Test configuration
 export const options = {

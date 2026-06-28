@@ -49,8 +49,8 @@ test.describe('BrainBytes E2E - Auth Flow', () => {
     const response = await request.post(`${backendUrl}/api/auth/register`, {
       data: testUser,
     });
-    // May succeed (201) or fail if user already exists (409)
-    expect([201, 409]).toContain(response.status());
+    // May succeed (201) or fail if user already exists (400 — see routes/auth.js line 28)
+    expect([201, 400]).toContain(response.status());
   });
 
   test('should allow user login', async ({ request }) => {
