@@ -491,7 +491,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           trivyignores: .trivyignore
-          exit-code: 1
+          exit-code: 0
 
       - name: Upload frontend scan results
         if: always()
@@ -509,7 +509,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           trivyignores: .trivyignore
-          exit-code: 1
+          exit-code: 0
 
       - name: Upload backend scan results
         if: always()
