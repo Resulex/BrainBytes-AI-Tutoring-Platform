@@ -12,6 +12,8 @@ RUN npx playwright install --with-deps chromium
 
 # Copy test files
 COPY e2e/ ./e2e/
-COPY playwright.config.js* ./
+
+# Copy playwright config to WORKDIR root (Playwright looks in CWD)
+COPY e2e/playwright.config.js ./playwright.config.js
 
 CMD ["npx", "playwright", "test", "--reporter=html,json,junit"]
