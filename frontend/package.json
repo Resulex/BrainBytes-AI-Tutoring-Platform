@@ -19,8 +19,8 @@
     "audit": "npm audit --audit-level=high"
   },
   "dependencies": {
-    "axios": "^0.27.2",
-    "next": "^12.3.4",
+    "axios": "^1.18.1",
+    "next": "^15.5.19",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "socket.io-client": "^4.7.2"

@@ -31,7 +31,8 @@ test.describe('BrainBytes E2E - API Integration', () => {
 
   test('should reject unauthenticated requests to protected routes', async ({ request }) => {
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
-    const response = await request.get(`${backendUrl}/api/users`);
+    // GET /api/preferences requires authentication (unlike /api/users)
+    const response = await request.get(`${backendUrl}/api/preferences`);
     // Should be 401 or 403 for unauthenticated access
     expect([401, 403]).toContain(response.status());
   });
@@ -41,7 +42,7 @@ test.describe('BrainBytes E2E - Auth Flow', () => {
   const testUser = {
     email: 'e2e-test@brainbytes.com',
     password: 'TestPass123!',
-    username: 'e2etester',
+    name: 'e2etester',
   };
 
   test('should allow user registration', async ({ request }) => {
@@ -49,8 +50,8 @@ test.describe('BrainBytes E2E - Auth Flow', () => {
     const response = await request.post(`${backendUrl}/api/auth/register`, {
       data: testUser,
     });
-    // May succeed (201) or fail if user already exists (409)
-    expect([201, 409]).toContain(response.status());
+    // May succeed (201) or fail if user already exists (400 — see routes/auth.js line 28)
+    expect([201, 400]).toContain(response.status());
   });
 
   test('should allow user login', async ({ request }) => {

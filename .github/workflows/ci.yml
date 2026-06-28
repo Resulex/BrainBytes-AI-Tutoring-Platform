@@ -1,19 +1,17 @@
-name: BrainBytes CI
+name: BrainBytes CI (Fast)
 
 on:
   push:
     branches: [ main, development ]
   pull_request:
     branches: [ main, development ]
-  workflow_dispatch:
 
 jobs:
-  # LINT
+  # ─── CODE QUALITY (lint + format) ───
   lint:
-    name: Lint Code
+    name: Lint & Format
     runs-on: ubuntu-latest
     timeout-minutes: 5
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -23,13 +21,23 @@ jobs:
         with:
           node-version: '20'
 
-      # Cache frontend dependencies
       - name: Cache frontend node_modules
         uses: actions/cache@v4
         id: cache-frontend-lint
         with:
           path: frontend/node_modules
-          key: ${{ runner.os }}-frontend-${{ hashFiles('frontend/package-lock.json') }}
+          key: frontend-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            frontend-${{ runner.os }}-node20-
+
+      - name: Cache backend node_modules
+        uses: actions/cache@v4
+        id: cache-backend-lint
+        with:
+          path: backend/node_modules
+          key: backend-${{ runner.os }}-node20-${{ hashFiles('backend/package-lock.json') }}
+          restore-keys: |
+            backend-${{ runner.os }}-node20-
 
       - name: Install root dependencies (for eslint.config.mjs)
         run: npm install --legacy-peer-deps
@@ -39,28 +47,28 @@ jobs:
         working-directory: ./frontend
         run: npm install --legacy-peer-deps --prefer-offline
 
-      - name: Lint frontend code
-        run: npx eslint frontend/ || echo "::warning::Frontend linting failed"
-
-      # Cache backend dependencies
-      - name: Cache backend node_modules
-        uses: actions/cache@v4
-        id: cache-backend-lint
-        with:
-          path: backend/node_modules
-          key: ${{ runner.os }}-backend-${{ hashFiles('backend/package-lock.json') }}
-
       - name: Install backend dependencies
         if: steps.cache-backend-lint.outputs.cache-hit != 'true'
         working-directory: ./backend
         run: npm install --prefer-offline
 
-      - name: Lint backend code
-        run: npx eslint backend/ || echo "::warning::Backend linting failed"
+      - name: Lint frontend (ESLint)
+        run: npx eslint frontend/
 
-  # TEST (matrix across Node versions)
-  test:
-    name: Test (Node ${{ matrix.node-version }})
+      - name: Lint backend (ESLint)
+        run: npx eslint backend/
+
+      - name: Check frontend formatting (Prettier)
+        working-directory: ./frontend
+        run: npm run format:check
+
+      - name: Check backend formatting (Prettier)
+        working-directory: ./backend
+        run: npm run format:check
+
+  # ─── FRONTEND UNIT TESTS ───
+  test-frontend:
+    name: Frontend Tests (Node ${{ matrix.node-version }})
     needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -68,7 +76,6 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [18, 20]
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -77,48 +84,62 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
-      # --- FRONTEND ---
       - name: Cache frontend node_modules
         uses: actions/cache@v4
-        id: cache-frontend-test
+        id: cache-frontend
         with:
           path: frontend/node_modules
-          key: ${{ runner.os }}-frontend-${{ matrix.node-version }}-${{ hashFiles('frontend/package-lock.json') }}
+          key: frontend-${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            frontend-${{ runner.os }}-node${{ matrix.node-version }}-
 
       - name: Install frontend dependencies
-        if: steps.cache-frontend-test.outputs.cache-hit != 'true'
+        if: steps.cache-frontend.outputs.cache-hit != 'true'
         working-directory: ./frontend
         run: npm install --legacy-peer-deps --prefer-offline
 
       - name: Run frontend tests
         working-directory: ./frontend
-        run: npm test || echo "::warning::Frontend tests failed"
-        continue-on-error: true
+        run: npm run test:ci
 
-      # --- BACKEND ---
+  # ─── BACKEND UNIT TESTS ───
+  test-backend:
+    name: Backend Tests (Node ${{ matrix.node-version }})
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
       - name: Cache backend node_modules
         uses: actions/cache@v4
-        id: cache-backend-test
+        id: cache-backend
         with:
           path: backend/node_modules
-          key: ${{ runner.os }}-backend-${{ matrix.node-version }}-${{ hashFiles('backend/package-lock.json') }}
+          key: backend-${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('backend/package-lock.json') }}
+          restore-keys: |
+            backend-${{ runner.os }}-node${{ matrix.node-version }}-
 
       - name: Install backend dependencies
-        if: steps.cache-backend-test.outputs.cache-hit != 'true'
+        if: steps.cache-backend.outputs.cache-hit != 'true'
         working-directory: ./backend
         run: npm install --prefer-offline
 
       - name: Run backend tests
         working-directory: ./backend
-        run: npm test
-
-      # Upload test artifacts
-      - name: Upload backend test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-node-${{ matrix.node-version }}
-          path: |
-            backend/coverage/
-            backend/junit.xml
+        run: npm run test:ci

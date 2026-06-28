@@ -40,8 +40,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
-      - JWT_SECRET=${JWT_SECRET:-brainbytes-dev-secret-key-change-in-production}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-placeholder-for-ci}
+      - JWT_SECRET=${JWT_SECRET:-brainbytes-ci-jwt-secret}
       - NODE_ENV=${NODE_ENV:-production}
       - MONGODB_URI=${MONGODB_URI:-mongodb://mongo:27017/brainbytes}
     depends_on:
@@ -69,11 +69,9 @@ services:
       start_period: 40s
       retries: 5
 
-  # MongoDB container
+  # MongoDB container (internal network only — not exposed to host)
   mongo:
     image: mongo:4.4
-    ports:
-      - "27017:27017"
     volumes:
       - mongo-data:/data/db
     restart: unless-stopped

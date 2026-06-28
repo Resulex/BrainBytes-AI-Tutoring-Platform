@@ -11,6 +11,12 @@ RUN npm install --production && \
 FROM node:20-alpine AS runner
 WORKDIR /usr/src/app
 
+# Upgrade Alpine packages (patch OS CVEs like libcrypto3/libssl3)
+# and upgrade npm to patch CVEs in bundled npm deps
+RUN apk upgrade --no-cache && \
+    npm install -g npm@latest && \
+    npm cache clean --force
+
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 appuser

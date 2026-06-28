@@ -10,7 +10,8 @@ services:
     environment:
       - NODE_ENV=test
       - JWT_SECRET=brainbytes-e2e-test-secret
-      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-placeholder-for-e2e}
+      - MONGODB_URI=mongodb://mongo:27017/brainbytes
 
   e2e-tests:
     build:
@@ -22,6 +23,7 @@ services:
       backend:
         condition: service_healthy
     environment:
+      - CI=true
       - BASE_URL=http://frontend:3000
       - BACKEND_URL=http://backend:3000
     volumes:

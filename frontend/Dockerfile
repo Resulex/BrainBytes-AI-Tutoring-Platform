@@ -19,21 +19,33 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 RUN npm run build
 
-# Stage 3: Production runner
+# Stage 3: Production deps
+FROM node:20-alpine AS prod-deps
+WORKDIR /usr/src/app
+COPY --from=builder /usr/src/app/package.json ./package.json
+COPY --from=builder /usr/src/app/package-lock.json ./package-lock.json
+RUN npm install --omit=dev --legacy-peer-deps && \
+    npm cache clean --force
+
+# Stage 4: Production runner
 FROM node:20-alpine AS runner
 WORKDIR /usr/src/app
+
+# Upgrade Alpine packages (patch OS CVEs like libcrypto3/libssl3)
+# and upgrade npm to patch CVEs in bundled npm deps (cross-spawn, glob, minimatch, tar)
+RUN apk upgrade --no-cache && \
+    apk add --no-cache wget && \
+    npm install -g npm@latest && \
+    npm cache clean --force
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Install wget for Docker health check
-RUN apk add --no-cache wget
-
 # Copy built assets
 COPY --from=builder /usr/src/app/public ./public
 COPY --from=builder /usr/src/app/.next ./.next
-COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY --from=prod-deps /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/package.json ./package.json
 COPY --from=builder /usr/src/app/next.config.js ./next.config.js
 
