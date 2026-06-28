@@ -31,12 +31,16 @@ RUN npm install --omit=dev --legacy-peer-deps && \
 FROM node:20-alpine AS runner
 WORKDIR /usr/src/app
 
+# Upgrade Alpine packages (patch OS CVEs like libcrypto3/libssl3)
+# and upgrade npm to patch CVEs in bundled npm deps (cross-spawn, glob, minimatch, tar)
+RUN apk upgrade --no-cache && \
+    apk add --no-cache wget && \
+    npm install -g npm@latest && \
+    npm cache clean --force
+
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
-
-# Install wget for Docker health check
-RUN apk add --no-cache wget
 
 # Copy built assets
 COPY --from=builder /usr/src/app/public ./public

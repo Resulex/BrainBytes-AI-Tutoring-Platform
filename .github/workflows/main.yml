@@ -490,6 +490,7 @@ jobs:
           output: trivy-frontend.sarif
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+          trivyignores: .trivyignore
           exit-code: 1
 
       - name: Upload frontend scan results
@@ -507,6 +508,7 @@ jobs:
           output: trivy-backend.sarif
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+          trivyignores: .trivyignore
           exit-code: 1
 
       - name: Upload backend scan results
