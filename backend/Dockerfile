@@ -13,7 +13,13 @@ WORKDIR /usr/src/app
 
 # Upgrade Alpine packages (patch OS CVEs like libcrypto3/libssl3)
 # and upgrade npm to patch CVEs in bundled npm deps
-RUN apk upgrade --no-cache && \
+# Retry loop handles transient I/O errors from Alpine CDN in CI
+RUN for i in $(seq 1 5); do \
+        apk update && \
+        apk upgrade && \
+        break || sleep 10; \
+    done && \
+    rm -rf /var/cache/apk/* && \
     npm install -g npm@latest && \
     npm cache clean --force
 
