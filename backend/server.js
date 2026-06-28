@@ -293,8 +293,6 @@ try {
 mongoose
   .connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/brainbytes', {
     retryWrites: true,
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
   })
   .then(() => {
     logger.info('Connected to MongoDB');
