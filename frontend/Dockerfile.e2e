@@ -7,8 +7,8 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm ci
 
-# Install Playwright browsers matching the installed version
-RUN npx playwright install --with-deps chromium
+# Install Playwright browsers matching the installed version (both chromium & firefox)
+RUN npx playwright install --with-deps chromium firefox
 
 # Copy test files
 COPY e2e/ ./e2e/
