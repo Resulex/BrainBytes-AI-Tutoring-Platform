@@ -41,7 +41,7 @@ test.describe('BrainBytes E2E - Auth Flow', () => {
   const testUser = {
     email: 'e2e-test@brainbytes.com',
     password: 'TestPass123!',
-    username: 'e2etester',
+    name: 'e2etester',
   };
 
   test('should allow user registration', async ({ request }) => {

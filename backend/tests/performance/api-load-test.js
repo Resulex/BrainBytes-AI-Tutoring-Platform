@@ -157,22 +157,49 @@ export default function () {
 }
 
 export function handleSummary(data) {
+  // Safe accessor — k6's goja runtime does not support optional chaining (?.)
+  var m = (data && data.metrics) || {};
+  var root = data && data.root_group;
+
+  var totalRequests = (m.http_reqs && m.http_reqs.values && m.http_reqs.values.count) || 0;
+  var failedRequests = (m.http_req_failed && m.http_req_failed.values && m.http_req_failed.values.rate) || 0;
+  var avgDuration = (m.http_req_duration && m.http_req_duration.values && m.http_req_duration.values.avg) || 0;
+  var p95Duration = (m.http_req_duration && m.http_req_duration.values && m.http_req_duration.values['p(95)']) || 0;
+  var p99Duration = (m.http_req_duration && m.http_req_duration.values && m.http_req_duration.values['p(99)']) || 0;
+  var maxDuration = (m.http_req_duration && m.http_req_duration.values && m.http_req_duration.values.max) || 0;
+  var errorRateVal = (m.errors && m.errors.values && m.errors.values.rate) || 0;
+  var vus = (m.vus && m.vus.values && m.vus.values.value) || 0;
+  var iterations = (m.iterations && m.iterations.values && m.iterations.values.count) || 0;
+
+  var checks = (root && root.checks) || [];
+  var checksPassed = checks.reduce(function (acc, c) {
+    return acc + (c.passes || 0);
+  }, 0);
+  var checksTotal = checks.reduce(function (acc, c) {
+    return acc + (c.passes || 0) + (c.fails || 0);
+  }, 0);
+
+  var thresholds = null;
+  if (m.http_req_duration && m.http_req_duration.thresholds) {
+    thresholds = m.http_req_duration.thresholds["p(95)<2000"];
+  }
+  var thresholdsPassed = !(thresholds && thresholds.ok === false);
+
   // Generate a JSON summary for CI integration
-  const summary = {
+  var summary = {
     timestamp: new Date().toISOString(),
-    totalRequests: data.metrics.http_reqs?.values?.count || 0,
-    failedRequests: data.metrics.http_req_failed?.values?.rate || 0,
-    avgDuration: data.metrics.http_req_duration?.values?.avg || 0,
-    p95Duration: data.metrics.http_req_duration?.values['p(95)'] || 0,
-    p99Duration: data.metrics.http_req_duration?.values['p(99)'] || 0,
-    maxDuration: data.metrics.http_req_duration?.values?.max || 0,
-    errorRate: data.metrics.errors?.values?.rate || 0,
-    vus: data.metrics.vus?.values?.value || 0,
-    iterations: data.metrics.iterations?.values?.count || 0,
-    checksPassed: data.root_group?.checks?.reduce((acc, c) => acc + (c.passes || 0), 0) || 0,
-    checksTotal:
-      data.root_group?.checks?.reduce((acc, c) => acc + (c.passes || 0) + (c.fails || 0), 0) || 0,
-    thresholdsPassed: !data.metrics.http_req_duration?.thresholds?.['p(95)<2000']?.ok === false,
+    totalRequests: totalRequests,
+    failedRequests: failedRequests,
+    avgDuration: avgDuration,
+    p95Duration: p95Duration,
+    p99Duration: p99Duration,
+    maxDuration: maxDuration,
+    errorRate: errorRateVal,
+    vus: vus,
+    iterations: iterations,
+    checksPassed: checksPassed,
+    checksTotal: checksTotal,
+    thresholdsPassed: thresholdsPassed,
   };
 
   return {
