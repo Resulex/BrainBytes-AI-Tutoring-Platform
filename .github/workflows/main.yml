@@ -468,8 +468,8 @@ jobs:
           push: false
           load: true
           tags: brainbytes/frontend:latest
-          cache-from: type=gha,scope=frontend-v2
-          cache-to: type=gha,mode=max,scope=frontend-v2
+          cache-from: type=gha,scope=frontend-v3
+          cache-to: type=gha,mode=max,scope=frontend-v3
 
       - name: Build backend image
         uses: docker/build-push-action@v5
@@ -478,8 +478,8 @@ jobs:
           push: false
           load: true
           tags: brainbytes/backend:latest
-          cache-from: type=gha,scope=backend-v2
-          cache-to: type=gha,mode=max,scope=backend-v2
+          cache-from: type=gha,scope=backend-v3
+          cache-to: type=gha,mode=max,scope=backend-v3
 
       # ── Container Vulnerability Scans (Trivy) ──
       - name: Scan frontend image
