@@ -162,11 +162,16 @@ export function handleSummary(data) {
   var root = data && data.root_group;
 
   var totalRequests = (m.http_reqs && m.http_reqs.values && m.http_reqs.values.count) || 0;
-  var failedRequests = (m.http_req_failed && m.http_req_failed.values && m.http_req_failed.values.rate) || 0;
-  var avgDuration = (m.http_req_duration && m.http_req_duration.values && m.http_req_duration.values.avg) || 0;
-  var p95Duration = (m.http_req_duration && m.http_req_duration.values && m.http_req_duration.values['p(95)']) || 0;
-  var p99Duration = (m.http_req_duration && m.http_req_duration.values && m.http_req_duration.values['p(99)']) || 0;
-  var maxDuration = (m.http_req_duration && m.http_req_duration.values && m.http_req_duration.values.max) || 0;
+  var failedRequests =
+    (m.http_req_failed && m.http_req_failed.values && m.http_req_failed.values.rate) || 0;
+  var avgDuration =
+    (m.http_req_duration && m.http_req_duration.values && m.http_req_duration.values.avg) || 0;
+  var p95Duration =
+    (m.http_req_duration && m.http_req_duration.values && m.http_req_duration.values['p(95)']) || 0;
+  var p99Duration =
+    (m.http_req_duration && m.http_req_duration.values && m.http_req_duration.values['p(99)']) || 0;
+  var maxDuration =
+    (m.http_req_duration && m.http_req_duration.values && m.http_req_duration.values.max) || 0;
   var errorRateVal = (m.errors && m.errors.values && m.errors.values.rate) || 0;
   var vus = (m.vus && m.vus.values && m.vus.values.value) || 0;
   var iterations = (m.iterations && m.iterations.values && m.iterations.values.count) || 0;
@@ -181,7 +186,7 @@ export function handleSummary(data) {
 
   var thresholds = null;
   if (m.http_req_duration && m.http_req_duration.thresholds) {
-    thresholds = m.http_req_duration.thresholds["p(95)<2000"];
+    thresholds = m.http_req_duration.thresholds['p(95)<2000'];
   }
   var thresholdsPassed = !(thresholds && thresholds.ok === false);
 
