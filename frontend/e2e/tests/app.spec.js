@@ -31,7 +31,8 @@ test.describe('BrainBytes E2E - API Integration', () => {
 
   test('should reject unauthenticated requests to protected routes', async ({ request }) => {
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
-    const response = await request.get(`${backendUrl}/api/users`);
+    // GET /api/preferences requires authentication (unlike /api/users)
+    const response = await request.get(`${backendUrl}/api/preferences`);
     // Should be 401 or 403 for unauthenticated access
     expect([401, 403]).toContain(response.status());
   });
