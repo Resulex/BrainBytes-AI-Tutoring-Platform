@@ -9,6 +9,6 @@ RUN npm ci
 
 # Copy test files
 COPY e2e/ ./e2e/
-COPY playwright.config.js ./playwright.config.js 2>/dev/null || true
+COPY playwright.config.js* ./
 
 CMD ["npx", "playwright", "test", "--reporter=html,json,junit"]

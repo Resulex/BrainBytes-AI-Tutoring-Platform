@@ -14,7 +14,6 @@ services:
         condition: service_healthy
     restart: unless-stopped
     deploy:
-      replicas: 2
       resources:
         limits:
           cpus: '0.5'
@@ -50,7 +49,6 @@ services:
         condition: service_healthy
     restart: unless-stopped
     deploy:
-      replicas: 2
       resources:
         limits:
           cpus: '1.0'
