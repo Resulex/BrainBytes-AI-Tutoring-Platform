@@ -481,7 +481,7 @@ jobs:
 
       # ── Container Vulnerability Scans (Trivy) ──
       - name: Scan frontend image
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: brainbytes/frontend:latest
           format: sarif
@@ -498,7 +498,7 @@ jobs:
           category: trivy-frontend
 
       - name: Scan backend image
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: brainbytes/backend:latest
           format: sarif
