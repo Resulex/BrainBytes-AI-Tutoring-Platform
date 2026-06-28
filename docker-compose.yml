@@ -14,6 +14,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     deploy:
+      replicas: 2
       resources:
         limits:
           cpus: '0.5'
@@ -41,14 +42,15 @@ services:
       - "3000:3000"
     environment:
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
-      - JWT_SECRET=${JWT_SECRET:-brainbytes-dev-secret-key-change-in-production}
-      - NODE_ENV=${NODE_ENV:-production}
-      - MONGODB_URI=${MONGODB_URI:-mongodb://mongo:27017/brainbytes}
+      - JWT_SECRET=${JWT_SECRET}
+      - NODE_ENV=${NODE_ENV}
+      - MONGODB_URI=${MONGODB_URI}
     depends_on:
       mongo:
         condition: service_healthy
     restart: unless-stopped
     deploy:
+      replicas: 2
       resources:
         limits:
           cpus: '1.0'
@@ -69,11 +71,9 @@ services:
       start_period: 40s
       retries: 5
 
-  # MongoDB container
+  # MongoDB container (internal network only — not exposed to host)
   mongo:
     image: mongo:4.4
-    ports:
-      - "27017:27017"
     volumes:
       - mongo-data:/data/db
     restart: unless-stopped

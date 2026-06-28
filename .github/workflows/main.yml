@@ -11,6 +11,7 @@ permissions:
   contents: read
   checks: write
   pull-requests: write
+  security-events: write
 
 env:
   DOCKER_BUILDKIT: 1
@@ -90,13 +91,47 @@ jobs:
       # ── Dependency Vulnerability Audit ──
       - name: Audit frontend dependencies
         working-directory: ./frontend
-        run: npm run audit
-        continue-on-error: true
+        run: |
+          npm audit --json > /tmp/frontend-audit.json 2>&1 || true
+          VULNS=$(node -e "
+            const fs = require('fs');
+            try {
+              const data = JSON.parse(fs.readFileSync('/tmp/frontend-audit.json', 'utf8'));
+              const high = Object.values(data.vulnerabilities || {}).filter(v => v.severity === 'high' || v.severity === 'critical').length;
+              console.log('HIGH_CRITICAL=' + high);
+            } catch(e) { console.log('PARSE_ERROR=1'); }
+          ")
+          echo "$VULNS"
+          if echo "$VULNS" | grep -q 'HIGH_CRITICAL=[1-9]'; then
+            echo "::error::Frontend has high/critical vulnerabilities — review npm audit output"
+            exit 1
+          elif echo "$VULNS" | grep -q 'PARSE_ERROR=1'; then
+            echo "::warning::Could not parse frontend npm audit output"
+          else
+            echo "::warning::Frontend npm audit completed (low/moderate vulnerabilities may exist)"
+          fi
 
       - name: Audit backend dependencies
         working-directory: ./backend
-        run: npm run audit
-        continue-on-error: true
+        run: |
+          npm audit --json > /tmp/backend-audit.json 2>&1 || true
+          VULNS=$(node -e "
+            const fs = require('fs');
+            try {
+              const data = JSON.parse(fs.readFileSync('/tmp/backend-audit.json', 'utf8'));
+              const high = Object.values(data.vulnerabilities || {}).filter(v => v.severity === 'high' || v.severity === 'critical').length;
+              console.log('HIGH_CRITICAL=' + high);
+            } catch(e) { console.log('PARSE_ERROR=1'); }
+          ")
+          echo "$VULNS"
+          if echo "$VULNS" | grep -q 'HIGH_CRITICAL=[1-9]'; then
+            echo "::error::Backend has high/critical vulnerabilities — review npm audit output"
+            exit 1
+          elif echo "$VULNS" | grep -q 'PARSE_ERROR=1'; then
+            echo "::warning::Could not parse backend npm audit output"
+          else
+            echo "::warning::Backend npm audit completed (low/moderate vulnerabilities may exist)"
+          fi
 
       # ── Secret Scanning (Gitleaks) ──
       - name: Scan for secrets
@@ -135,6 +170,25 @@ jobs:
           else
             echo "No large files detected."
           fi
+
+  # ─── CODEQL SAST ───
+  codeql:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      security-events: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
 
   # ─── FRONTEND UNIT TESTS ──
   test-frontend:
@@ -288,33 +342,31 @@ jobs:
         working-directory: ./frontend
         run: npx playwright install --with-deps chromium firefox
 
-      - name: Start services with Docker Compose
+      - name: Start services with Docker Compose (E2E config)
         run: |
-          docker compose -f docker-compose.yml build --no-cache
-          docker compose -f docker-compose.yml up -d --wait --wait-timeout 120
-          docker compose ps
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml build --no-cache
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --wait --wait-timeout 120
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml ps
 
       - name: Debug Docker containers (on failure)
         if: failure()
         run: |
           echo "=== Container Status ==="
-          docker compose ps -a
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml ps -a
           echo "=== Backend Logs ==="
-          docker compose logs backend
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml logs backend
           echo "=== MongoDB Logs ==="
-          docker compose logs mongo
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml logs mongo
+          echo "=== E2E Test Logs ==="
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml logs e2e-tests || true
 
-      - name: Run Playwright E2E tests
-        working-directory: ./frontend
-        run: npx playwright test --reporter=html,json,junit
-        env:
-          BASE_URL: http://localhost:8080
-          BACKEND_URL: http://localhost:3000
-        continue-on-error: true
+      - name: Run E2E tests (via e2e-tests service)
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml run --rm e2e-tests
 
       - name: Stop Docker Compose
         if: always()
-        run: docker compose down -v
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml down -v
 
       - name: Upload E2E test report
         if: always()
@@ -381,7 +433,6 @@ jobs:
         run: k6 run backend/tests/performance/api-load-test.js --summary-export=backend/tests/performance/summary.json
         env:
           BASE_URL: http://localhost:3000
-        continue-on-error: true
 
       - name: Stop Docker Compose
         if: always()
@@ -427,6 +478,41 @@ jobs:
           tags: brainbytes/backend:latest
           cache-from: type=gha,scope=backend-v2
           cache-to: type=gha,mode=max,scope=backend-v2
+
+      # ── Container Vulnerability Scans (Trivy) ──
+      - name: Scan frontend image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: brainbytes/frontend:latest
+          format: sarif
+          output: trivy-frontend.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+
+      - name: Upload frontend scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-frontend.sarif
+          category: trivy-frontend
+
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: brainbytes/backend:latest
+          format: sarif
+          output: trivy-backend.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+
+      - name: Upload backend scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-backend.sarif
+          category: trivy-backend
 
       - name: Test Docker Compose composition
         run: |

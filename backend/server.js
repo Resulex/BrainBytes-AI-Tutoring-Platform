@@ -43,6 +43,42 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
+// ══════════════════════════════════════════════════════
+// Startup guard — crash immediately if critical secrets
+// are missing. Never run on insecure defaults.
+// ══════════════════════════════════════════════════════
+const REQUIRED_ENV_VARS = [
+  'JWT_SECRET',
+  'MONGODB_URI',
+  'HUGGINGFACE_TOKEN',
+];
+
+const missingVars = REQUIRED_ENV_VARS.filter((name) => !process.env[name]);
+
+if (missingVars.length > 0) {
+  logger.error(
+    { missingVars },
+    'FATAL: Required environment variables are not set. Refusing to start.',
+  );
+  console.error(
+    `FATAL: Missing required environment variables: ${missingVars.join(', ')}`,
+  );
+  console.error(
+    'Set these variables in your .env file, Docker environment, or Railway service variables.',
+  );
+  process.exit(1);
+}
+
+// NODE_ENV defaults to production if unset (safe default — not a secret)
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'production';
+}
+
+logger.info(
+  { env: process.env.NODE_ENV },
+  'Environment variables validated — starting server',
+);
+
 // Trust the Railway load balancer proxy so express-rate-limit
 // correctly identifies real client IPs from X-Forwarded-For
 app.set('trust proxy', 1);
