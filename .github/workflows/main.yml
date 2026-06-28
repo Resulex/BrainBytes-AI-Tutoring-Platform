@@ -459,10 +459,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build frontend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: false
@@ -472,7 +472,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=frontend-v3
 
       - name: Build backend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: false
@@ -499,6 +499,7 @@ jobs:
         with:
           sarif_file: trivy-frontend.sarif
           category: trivy-frontend
+        continue-on-error: true
 
       - name: Scan backend image
         uses: aquasecurity/trivy-action@v0.36.0
@@ -517,6 +518,7 @@ jobs:
         with:
           sarif_file: trivy-backend.sarif
           category: trivy-backend
+        continue-on-error: true
 
       - name: Test Docker Compose composition
         run: |
