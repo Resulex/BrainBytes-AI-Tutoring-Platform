@@ -47,7 +47,7 @@ const PORT = process.env.PORT || 3000;
 // Startup guard — crash immediately if critical secrets
 // are missing. Never run on insecure defaults.
 // ══════════════════════════════════════════════════════
-const REQUIRED_ENV_VARS = ['JWT_SECRET', 'MONGODB_URI', 'HUGGINGFACE_TOKEN'];
+const REQUIRED_ENV_VARS = ['JWT_SECRET', 'HUGGINGFACE_TOKEN'];
 
 const missingVars = REQUIRED_ENV_VARS.filter((name) => !process.env[name]);
 

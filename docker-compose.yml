@@ -40,10 +40,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
-      - JWT_SECRET=${JWT_SECRET}
-      - NODE_ENV=${NODE_ENV}
-      - MONGODB_URI=${MONGODB_URI}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-placeholder-for-ci}
+      - JWT_SECRET=${JWT_SECRET:-brainbytes-ci-jwt-secret}
+      - NODE_ENV=${NODE_ENV:-production}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongo:27017/brainbytes}
     depends_on:
       mongo:
         condition: service_healthy
