@@ -9,6 +9,13 @@ on:
       - '**.md'
       - 'docs/**'
       - '.github/workflows/*.yml'
+  pull_request:
+    branches:
+      - main
+      - development
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch:
     inputs:
       environment:
@@ -53,6 +60,13 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "environment=${{ github.event.inputs.environment }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # On PRs base_ref is the target branch (main/development)
+            if [[ "${{ github.base_ref }}" == "main" ]]; then
+              echo "environment=staging" >> "$GITHUB_OUTPUT"
+            else
+              echo "environment=test" >> "$GITHUB_OUTPUT"
+            fi
           elif [[ "${{ github.ref_name }}" == "production" ]]; then
             echo "environment=production" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.ref_name }}" == "main" ]]; then
