@@ -7,15 +7,6 @@ CI/CD](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workfl
 [![CI
 Status](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/ci.yml)
 
-[![Docker Build
-Status](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/build.yml/badge.svg)](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/build.yml)
-
-[![Lint
-Status](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/lint.yml/badge.svg)](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/lint.yml)
-
-[![CI Test
-Status](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/test.yml/badge.svg)](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/test.yml)
-
 [![Deploy
 Status](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/deploy.yml/badge.svg)](https://github.com/Resulex/BrainBytes-AI-Tutoring-Platform/actions/workflows/deploy.yml)
 
