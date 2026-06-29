@@ -510,3 +510,48 @@ Docker version 29.4.1, build 055a478
 - [CI/CD Implementation and Testing Documentation](https://docs.google.com/document/d/15Xo--sSDzwhhLpeyZmdhPw-qLuAiU1n-eYFgr0FbFkY/edit?usp=sharing)
 - [Deployment Plan Documentation](https://docs.google.com/document/d/15uaHOPKM--08Mhd5ZjJibSCVzGSw3QeDIC_z69zGdeM/edit?usp=sharing)
 - [Milestone 2 Documentation](https://docs.google.com/document/d/1JGmgXinJhcwiIrOKrD6c6GpZu-I6txaua_B3yKzxFrA/edit?usp=sharing)
+
+### Implemented and Addressed Items
+
+**1a – Automated Docker Builds**
+Removed continue-on-error: true from Docker build steps – image build failures now stop the pipeline immediately.
+Consolidated redundant workflow files (build.yml, test.yml, lint.yml have been removed), leaving ci.yml and main.yml with clearly separated, non‑duplicating stages.
+
+**1b – Automated Testing**
+Removed continue-on-error: true from frontend unit test steps – test failures now block the pipeline.
+Hooked docker-compose.e2e.yml into the active deployment pipeline. The e2e-gate job runs full end‑to‑end tests **before** the build-and-push stage in deploy.yml.
+
+**1c – Code Quality and Security**
+Added a Container Vulnerability Scanner (Trivy) that runs on both backend and frontend images after they are built.
+Integrated Static Application Security Testing (SAST) with **CodeQL** in main.yml for deep code analysis.
+npm audit now **fails the pipeline** if high/critical vulnerabilities are detected (no longer ignored via continue-on-error).
+
+**1d – Deployment Automation**
+Implemented **automatic rollback** via the rollback job in deploy.yml. If the post‑deployment verification fails, the pipeline automatically re‑deploys the last stable images (.last-stable-backend / .last-stable-frontend).
+
+**2a – Cloud Configuration**
+Defined **replication and autoscaling** in railway.json: numReplicas: 2, CPU threshold 70%, memory threshold 80%, min‑max replicas 2–5. (Resource alerting via Railway’s built‑in monitoring can be configured as a follow‑up.)
+
+**2b – Environment Variables**
+Removed hardcoded fallback secrets from docker-compose.yml; the application now **crashes on startup** if critical variables like JWT_SECRET are missing, instead of using insecure defaults.  
+  (CI injects secrets securely through GitHub Actions secrets.)
+
+**2c – Deployment Environment**
+Added a **Production** target in deploy.yml, protected by a **manual approval‑gate** (approval-gate job) that requires explicit sign‑off before production releases.
+
+**2d – Networking**
+MongoDB service has **no ports exposed** in docker-compose.yml – it is strictly internal‑network only. Only the backend container can reach the database.
+
+**3a - Project Overview**
+Added Missing information: Added technical project constraints, scope boundaries, or expected traffic load metrics.
+
+**3c - Cloud Deployment**
+Revised Diagram Sufficiency: Added conceptual system architecture diagram, visual drawing, flow explanation.
+
+**3e - Testing and Validation**
+Added documentation and configuration for active performance monitoring / live production system observability.
+
+**3f - Operational Guide**
+Added Database restoration steps/ disaster recovery procedures if data corruption occurs.
+
+
