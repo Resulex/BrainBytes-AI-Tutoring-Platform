@@ -203,8 +203,9 @@ jobs:
           cache-to: type=gha,mode=max
 
       # ── Container Vulnerability Scans (Trivy) ──
-      # exit-code: 0 — Trivy findings reported via SARIF, not step failure
+      # Non-blocking: Trivy failures must never block deploy
       - name: Scan backend image
+        continue-on-error: true
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ steps.meta.outputs.repo }}-backend:${{ steps.meta.outputs.sha }}
@@ -216,12 +217,14 @@ jobs:
 
       - name: Upload backend scan results
         if: always()
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-backend.sarif
           category: trivy-deploy-backend
 
       - name: Scan frontend image
+        continue-on-error: true
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ steps.meta.outputs.repo }}-frontend:${{ steps.meta.outputs.sha }}
@@ -233,6 +236,7 @@ jobs:
 
       - name: Upload frontend scan results
         if: always()
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-frontend.sarif

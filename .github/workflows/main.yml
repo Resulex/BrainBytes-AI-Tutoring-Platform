@@ -483,6 +483,7 @@ jobs:
 
       # ── Container Vulnerability Scans (Trivy) ──
       - name: Scan frontend image
+        continue-on-error: true
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: brainbytes/frontend:latest
@@ -502,6 +503,7 @@ jobs:
         continue-on-error: true
 
       - name: Scan backend image
+        continue-on-error: true
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: brainbytes/backend:latest
