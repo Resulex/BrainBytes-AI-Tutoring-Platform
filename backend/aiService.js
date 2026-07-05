@@ -128,11 +128,12 @@ async function generateResponse(question, preferredSubject = null, _context = nu
     let lastError = null;
 
     for (const model of MODELS) {
+      let aiStart;
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-        const aiStart = Date.now();
+        aiStart = Date.now();
 
         const response = await fetch(API_URL, {
           method: 'POST',
