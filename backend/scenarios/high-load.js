@@ -16,10 +16,14 @@ const { spawn } = require('child_process');
 
 const args = [
   'simulate-activity.js',
-  '--scenario', 'high-load',
-  '--concurrency', '5',
-  '--duration', '180',   // 3 minutes
-  '--peak-interval', '30', // 30s peak, 30s quiet
+  '--scenario',
+  'high-load',
+  '--concurrency',
+  '5',
+  '--duration',
+  '180', // 3 minutes
+  '--peak-interval',
+  '30', // 30s peak, 30s quiet
 ];
 
 console.log('=== High-Load Scenario ===');

@@ -16,9 +16,12 @@ const { spawn } = require('child_process');
 
 const args = [
   'simulate-activity.js',
-  '--scenario', 'resource-constraint',
-  '--concurrency', '4',
-  '--duration', '150',  // 2.5 minutes
+  '--scenario',
+  'resource-constraint',
+  '--concurrency',
+  '4',
+  '--duration',
+  '150', // 2.5 minutes
 ];
 
 console.log('=== Resource-Constraint Scenario ===');

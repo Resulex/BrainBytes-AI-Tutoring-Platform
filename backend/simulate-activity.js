@@ -111,14 +111,14 @@ async function simulateSession(workerId = 0) {
   const subject = SUBJECTS[Math.floor(Math.random() * SUBJECTS.length)];
   const shouldError = ERROR_RATE > 0 && Math.random() < ERROR_RATE;
 
-  console.log(`[W${workerId}] Starting session for ${subject}${shouldError ? ' [ERROR MODE]' : ''}...`);
+  console.log(
+    `[W${workerId}] Starting session for ${subject}${shouldError ? ' [ERROR MODE]' : ''}...`,
+  );
 
   // Step 1: Create session
   let sessionId;
   try {
-    const body = shouldError && Math.random() < 0.5
-      ? '{bad'
-      : JSON.stringify({ subject });
+    const body = shouldError && Math.random() < 0.5 ? '{bad' : JSON.stringify({ subject });
     const headers = { 'Content-Type': 'application/json' };
     const res = await fetch(`${BASE_URL}/api/sessions`, {
       method: 'POST',
@@ -128,7 +128,9 @@ async function simulateSession(workerId = 0) {
     const data = await res.json();
     sessionId = data.session?._id;
     if (!sessionId) {
-      console.log(`[W${workerId}] Session creation returned ${res.status}${shouldError ? ' (expected error)' : ''}`);
+      console.log(
+        `[W${workerId}] Session creation returned ${res.status}${shouldError ? ' (expected error)' : ''}`,
+      );
       if (shouldError) return; // error injection succeeded
     }
   } catch (err) {
@@ -155,9 +157,10 @@ async function simulateSession(workerId = 0) {
     return;
   }
 
-  const numQuestions = SCENARIO === 'high-load'
-    ? Math.floor(Math.random() * 2) + 1  // fewer questions in high-load for throughput
-    : Math.floor(Math.random() * 4) + 2;
+  const numQuestions =
+    SCENARIO === 'high-load'
+      ? Math.floor(Math.random() * 2) + 1 // fewer questions in high-load for throughput
+      : Math.floor(Math.random() * 4) + 2;
 
   const questions = sampleQuestions[subject] || sampleQuestions.general;
 
@@ -165,7 +168,8 @@ async function simulateSession(workerId = 0) {
     const question = questions[Math.floor(Math.random() * questions.length)];
 
     try {
-      let body, headers = { 'Content-Type': 'application/json' };
+      let body,
+        headers = { 'Content-Type': 'application/json' };
 
       if (shouldError && Math.random() < 0.4) {
         // Inject error payload
@@ -186,9 +190,10 @@ async function simulateSession(workerId = 0) {
       console.error(`[W${workerId}] Message error: ${err.message}`);
     }
 
-    const delay = SCENARIO === 'high-load'
-      ? Math.floor(Math.random() * 500) + 200   // fast bursts
-      : Math.floor(Math.random() * 2000) + 1000; // normal pacing
+    const delay =
+      SCENARIO === 'high-load'
+        ? Math.floor(Math.random() * 500) + 200 // fast bursts
+        : Math.floor(Math.random() * 2000) + 1000; // normal pacing
     await new Promise((r) => setTimeout(r, delay));
   }
 
@@ -227,9 +232,10 @@ async function workerLoop(workerId) {
     if (!running) break;
 
     // In peak mode, workers launch in bursts then sleep
-    const isPeakPhase = PEAK_INTERVAL > 0 && Math.floor(Date.now() / 1000 / PEAK_INTERVAL) % 2 === 0;
+    const isPeakPhase =
+      PEAK_INTERVAL > 0 && Math.floor(Date.now() / 1000 / PEAK_INTERVAL) % 2 === 0;
     const waitTime = isPeakPhase
-      ? Math.floor(Math.random() * 1000) + 200   // peak: rapid fire
+      ? Math.floor(Math.random() * 1000) + 200 // peak: rapid fire
       : Math.floor(Math.random() * 8000) + 4000; // off-peak: slow
 
     await new Promise((r) => setTimeout(r, waitTime));

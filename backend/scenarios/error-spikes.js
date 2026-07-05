@@ -15,10 +15,14 @@ const { spawn } = require('child_process');
 
 const args = [
   'simulate-activity.js',
-  '--scenario', 'error-spikes',
-  '--concurrency', '3',
-  '--duration', '120',  // 2 minutes
-  '--error-rate', '0.35', // 35% of sessions inject errors
+  '--scenario',
+  'error-spikes',
+  '--concurrency',
+  '3',
+  '--duration',
+  '120', // 2 minutes
+  '--error-rate',
+  '0.35', // 35% of sessions inject errors
 ];
 
 console.log('=== Error-Spikes Scenario ===');
