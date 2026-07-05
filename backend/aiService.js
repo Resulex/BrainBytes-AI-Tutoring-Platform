@@ -1,4 +1,5 @@
 const fetch = require('node-fetch');
+const { aiRequestDuration, aiRequestErrors } = require('./metrics');
 
 // Initialize our AI service
 const initializeAI = () => {
@@ -120,15 +121,19 @@ async function generateResponse(question, preferredSubject = null, _context = nu
     const token = process.env.HUGGINGFACE_TOKEN;
     if (!token) {
       console.warn('HUGGINGFACE_TOKEN not set. Skipping API call and using fallback.');
+      aiRequestErrors.inc({ model: 'none', error_type: 'missing_token' });
       throw new Error('HUGGINGFACE_TOKEN not configured');
     }
 
     let lastError = null;
 
     for (const model of MODELS) {
+      let aiStart;
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        aiStart = Date.now();
 
         const response = await fetch(API_URL, {
           method: 'POST',
@@ -161,6 +166,9 @@ async function generateResponse(question, preferredSubject = null, _context = nu
 
         if (!response.ok) {
           const errorBody = await response.text();
+          const aiDuration = (Date.now() - aiStart) / 1000;
+          aiRequestDuration.observe({ model, status: response.status }, aiDuration);
+          aiRequestErrors.inc({ model, error_type: `http_${response.status}` });
           console.log(
             `Model [${model}] failed: ${response.status} - ${errorBody.substring(0, 200)}`,
           );
@@ -180,21 +188,32 @@ async function generateResponse(question, preferredSubject = null, _context = nu
         if (choice && choice.message) {
           const content = choice.message.content || choice.message.reasoning_content || '';
           if (content.trim()) {
+            const aiDuration = (Date.now() - aiStart) / 1000;
+            aiRequestDuration.observe({ model, status: 200 }, aiDuration);
             return { category, response: content.trim() };
           }
         }
 
         console.log(`Model [${model}] returned empty response, trying next...`);
+        aiRequestErrors.inc({ model, error_type: 'empty_response' });
       } catch (modelError) {
+        const aiDuration = (Date.now() - aiStart) / 1000;
+
         if (modelError.name === 'AbortError') {
           console.log(`Model [${model}] timed out, trying next...`);
+          aiRequestDuration.observe({ model, status: 'timeout' }, aiDuration);
+          aiRequestErrors.inc({ model, error_type: 'timeout' });
         } else if (modelError.message && modelError.message.includes('authentication failed')) {
           // Auth failure is fatal - don't try other models
+          aiRequestDuration.observe({ model, status: 'auth_error' }, aiDuration);
+          aiRequestErrors.inc({ model, error_type: 'auth_failure' });
           throw modelError;
         } else {
           console.log(
             `Model [${model}] failed: ${modelError.message.split('\n')[0]}, trying next...`,
           );
+          aiRequestDuration.observe({ model, status: 'error' }, aiDuration);
+          aiRequestErrors.inc({ model, error_type: 'other' });
         }
         lastError = modelError;
       }

@@ -12,6 +12,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    networks:
+      - app-network
     restart: unless-stopped
     deploy:
       resources:
@@ -39,6 +41,7 @@ services:
     build: ./backend
     ports:
       - "3000:3000"
+      - "9080:9080"
     environment:
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-placeholder-for-ci}
       - JWT_SECRET=${JWT_SECRET:-brainbytes-ci-jwt-secret}
@@ -47,6 +50,8 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+    networks:
+      - app-network
     restart: unless-stopped
     deploy:
       resources:
@@ -74,6 +79,8 @@ services:
     image: mongo:4.4
     volumes:
       - mongo-data:/data/db
+    networks:
+      - app-network
     restart: unless-stopped
     deploy:
       resources:
@@ -90,6 +97,59 @@ services:
       start_period: 30s
       retries: 5
 
+  # --- MONITORING SERVICES ---
+  prometheus:
+    image: prom/prometheus:v2.43.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.5.0
+    container_name: node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.45.0
+    container_name: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - app-network
+    restart: unless-stopped
+
 # Define volumes for persistent data
 volumes:
   mongo-data:
+  prometheus_data:
+
+networks:
+  app-network:
+    driver: bridge

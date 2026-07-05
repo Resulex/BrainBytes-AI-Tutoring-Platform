@@ -3,6 +3,7 @@ const router = express.Router();
 const Session = require('../models/Session');
 const Message = require('../models/Message');
 const { authenticate, optionalAuth } = require('../middleware/auth');
+const { incrementActiveSessions, decrementActiveSessions } = require('../metrics');
 
 // POST /api/sessions - Create a new chat session
 router.post('/', optionalAuth, async (req, res) => {
@@ -14,6 +15,7 @@ router.post('/', optionalAuth, async (req, res) => {
       ipAddress: req.ip || '',
     });
     await session.save();
+    incrementActiveSessions();
     res.status(201).json({ session });
   } catch (error) {
     res.status(500).json({ error: 'Server error creating session.' });
@@ -85,6 +87,7 @@ router.put('/:id', authenticate, async (req, res) => {
     if (req.body.isActive === false) {
       updates.isActive = false;
       updates.endedAt = Date.now();
+      decrementActiveSessions();
     }
 
     const session = await Session.findByIdAndUpdate(

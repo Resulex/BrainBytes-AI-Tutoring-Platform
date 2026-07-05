@@ -37,6 +37,7 @@ RUN chown -R appuser:nodejs /usr/src/app
 USER appuser
 
 EXPOSE 3000
+EXPOSE 9080
 
 # Health check (uses built-in Node.js — no extra packages needed)
 HEALTHCHECK --interval=15s --timeout=10s --start-period=40s --retries=5 \

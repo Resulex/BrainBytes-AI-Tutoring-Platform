@@ -3,6 +3,7 @@ const Session = require('../models/Session');
 const aiService = require('../aiService');
 const { suggestFollowUps } = require('../utils/followUpSuggestions');
 const { buildConversationContext } = require('../utils/contextBuilder');
+const { incrementActiveSessions, decrementActiveSessions } = require('../metrics');
 
 // Track online users and typing status
 const onlineUsers = new Map(); // socketId -> { userId, name, sessionId }
@@ -49,6 +50,9 @@ function setupSocketHandlers(io) {
           userId: socket.userId,
           name: data.userName || 'Anonymous',
         });
+
+        // Increment the active sessions gauge for observability
+        incrementActiveSessions();
 
         // Emit current online count
         const sessionUsers = [...onlineUsers.values()].filter((u) => u.sessionId === sessionId);
@@ -219,6 +223,9 @@ function setupSocketHandlers(io) {
             typingUsers.delete(sessionId);
           }
         }
+
+        // Decrement the active sessions gauge (session implicitly abandoned on disconnect)
+        decrementActiveSessions();
 
         // Notify session
         io.to(`session:${sessionId}`).emit('user:left', {
