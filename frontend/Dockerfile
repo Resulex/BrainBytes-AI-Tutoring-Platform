@@ -4,7 +4,10 @@ FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /usr/src/app
 COPY package*.json ./
-RUN npm install --legacy-peer-deps && \
+RUN for i in $(seq 1 3); do \
+        npm install --legacy-peer-deps && \
+        break || sleep 10; \
+    done && \
     npm cache clean --force
 
 # Stage 2: Build the application
@@ -24,7 +27,10 @@ FROM node:20-alpine AS prod-deps
 WORKDIR /usr/src/app
 COPY --from=builder /usr/src/app/package.json ./package.json
 COPY --from=builder /usr/src/app/package-lock.json ./package-lock.json
-RUN npm install --omit=dev --legacy-peer-deps && \
+RUN for i in $(seq 1 3); do \
+        npm install --omit=dev --legacy-peer-deps && \
+        break || sleep 10; \
+    done && \
     npm cache clean --force
 
 # Stage 4: Production runner
@@ -33,7 +39,7 @@ WORKDIR /usr/src/app
 
 # Upgrade Alpine packages (patch OS CVEs like libcrypto3/libssl3)
 # and upgrade npm to patch CVEs in bundled npm deps (cross-spawn, glob, minimatch, tar)
-# Retry loop handles transient I/O errors from Alpine CDN in CI
+# Retry loops handle transient I/O errors from Alpine CDN / npm registry in CI
 RUN for i in $(seq 1 5); do \
         apk update && \
         apk upgrade && \
@@ -41,7 +47,10 @@ RUN for i in $(seq 1 5); do \
         break || sleep 10; \
     done && \
     rm -rf /var/cache/apk/* && \
-    npm install -g npm@latest && \
+    for i in $(seq 1 5); do \
+        npm install -g npm@latest && \
+        break || sleep 10; \
+    done && \
     npm cache clean --force
 
 # Create non-root user

@@ -4,7 +4,10 @@ FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /usr/src/app
 COPY package*.json ./
-RUN npm install --production && \
+RUN for i in $(seq 1 3); do \
+        npm install --production && \
+        break || sleep 10; \
+    done && \
     npm cache clean --force
 
 # Stage 2: Production image
@@ -13,14 +16,17 @@ WORKDIR /usr/src/app
 
 # Upgrade Alpine packages (patch OS CVEs like libcrypto3/libssl3)
 # and upgrade npm to patch CVEs in bundled npm deps
-# Retry loop handles transient I/O errors from Alpine CDN in CI
+# Retry loops handle transient I/O errors from Alpine CDN / npm registry in CI
 RUN for i in $(seq 1 5); do \
         apk update && \
         apk upgrade && \
         break || sleep 10; \
     done && \
     rm -rf /var/cache/apk/* && \
-    npm install -g npm@latest && \
+    for i in $(seq 1 5); do \
+        npm install -g npm@latest && \
+        break || sleep 10; \
+    done && \
     npm cache clean --force
 
 # Create non-root user for security
