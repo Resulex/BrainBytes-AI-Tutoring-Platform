@@ -17,6 +17,7 @@ const { validate } = require('./middleware/validate');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { authenticate } = require('./middleware/auth');
 const logger = require('./utils/logger');
+const { metricsMiddleware } = require('./metrics');
 
 // ── Global crash handlers ──
 // Prevent the process from dying on uncaught exceptions / unhandled rejections
@@ -275,6 +276,9 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// ── Prometheus metrics middleware (must be after logging, before routes) ──
+app.use(metricsMiddleware);
 
 // ── Start HTTP server EARLY (health check must respond quickly) ──
 // All remaining initialization happens after the server is listening
