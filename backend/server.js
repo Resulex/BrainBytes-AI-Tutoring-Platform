@@ -17,7 +17,7 @@ const { validate } = require('./middleware/validate');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { authenticate } = require('./middleware/auth');
 const logger = require('./utils/logger');
-const { metricsMiddleware } = require('./metrics');
+const { metricsMiddleware, startMetricsServer } = require('./metrics');
 
 // ── Global crash handlers ──
 // Prevent the process from dying on uncaught exceptions / unhandled rejections
@@ -284,6 +284,7 @@ app.use(metricsMiddleware);
 // All remaining initialization happens after the server is listening
 server.listen(PORT, () => {
   logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'Server listening');
+  startMetricsServer();
 });
 
 // Initialize AI model in background (don't crash if it fails)

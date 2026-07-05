@@ -55,9 +55,14 @@ metricsApp.get('/metrics', async (_req, res) => {
   res.end(await register.metrics());
 });
 
-metricsApp.listen(9080, () => {
-  console.log('Telemetry server listening on port 9080');
-});
+let metricsServer = null;
+
+function startMetricsServer() {
+  if (metricsServer) return; // already started (idempotent)
+  metricsServer = metricsApp.listen(9080, () => {
+    console.log('Telemetry server listening on port 9080');
+  });
+}
 
 // --- PATH NORMALIZATION ---
 // Replace dynamic segments (MongoDB ObjectIds, 24 hex chars) with
@@ -114,4 +119,5 @@ module.exports = {
   decrementActiveSessions,
   aiRequestDuration,
   aiRequestErrors,
+  startMetricsServer,
 };
