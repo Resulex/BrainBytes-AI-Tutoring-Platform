@@ -1,0 +1,17 @@
+groups:
+  - name: brainbytes_recording_rules
+    interval: 1m
+    rules:
+      - record: brainbytes:http_error_ratio:rate5m
+        expr: |
+          sum by (job) (rate(brainbytes_http_requests_total{status=~"5.."}[5m]))
+          /
+          sum by (job) (rate(brainbytes_http_requests_total[5m]))
+
+      - record: brainbytes:ai_response_latency_p99:histogram_quantile5m
+        expr: |
+          histogram_quantile(0.99, sum by (le, model) (rate(brainbytes_ai_request_duration_seconds_bucket[5m])))
+
+      - record: brainbytes:mobile_request_rate:rate5m
+        expr: |
+          sum by (device_type) (rate(brainbytes_messages_total{device_type="mobile"}[5m]))

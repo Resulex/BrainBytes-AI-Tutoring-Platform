@@ -1,0 +1,145 @@
+name: BrainBytes CI (Fast)
+
+on:
+  push:
+    branches: [ main, development ]
+  pull_request:
+    branches: [ main, development ]
+
+jobs:
+  # ─── CODE QUALITY (lint + format) ───
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache frontend node_modules
+        uses: actions/cache@v4
+        id: cache-frontend-lint
+        with:
+          path: frontend/node_modules
+          key: frontend-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            frontend-${{ runner.os }}-node20-
+
+      - name: Cache backend node_modules
+        uses: actions/cache@v4
+        id: cache-backend-lint
+        with:
+          path: backend/node_modules
+          key: backend-${{ runner.os }}-node20-${{ hashFiles('backend/package-lock.json') }}
+          restore-keys: |
+            backend-${{ runner.os }}-node20-
+
+      - name: Install root dependencies (for eslint.config.mjs)
+        run: npm install --legacy-peer-deps
+
+      - name: Install frontend dependencies
+        if: steps.cache-frontend-lint.outputs.cache-hit != 'true'
+        working-directory: ./frontend
+        run: npm install --legacy-peer-deps --prefer-offline
+
+      - name: Install backend dependencies
+        if: steps.cache-backend-lint.outputs.cache-hit != 'true'
+        working-directory: ./backend
+        run: npm install --prefer-offline
+
+      - name: Lint frontend (ESLint)
+        run: npx eslint frontend/
+
+      - name: Lint backend (ESLint)
+        run: npx eslint backend/
+
+      - name: Check frontend formatting (Prettier)
+        working-directory: ./frontend
+        run: npm run format:check
+
+      - name: Check backend formatting (Prettier)
+        working-directory: ./backend
+        run: npm run format:check
+
+  # ─── FRONTEND UNIT TESTS ───
+  test-frontend:
+    name: Frontend Tests (Node ${{ matrix.node-version }})
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Cache frontend node_modules
+        uses: actions/cache@v4
+        id: cache-frontend
+        with:
+          path: frontend/node_modules
+          key: frontend-${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            frontend-${{ runner.os }}-node${{ matrix.node-version }}-
+
+      - name: Install frontend dependencies
+        if: steps.cache-frontend.outputs.cache-hit != 'true'
+        working-directory: ./frontend
+        run: npm install --legacy-peer-deps --prefer-offline
+
+      - name: Run frontend tests
+        working-directory: ./frontend
+        run: npm run test:ci
+
+  # ─── BACKEND UNIT TESTS ───
+  test-backend:
+    name: Backend Tests (Node ${{ matrix.node-version }})
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Cache backend node_modules
+        uses: actions/cache@v4
+        id: cache-backend
+        with:
+          path: backend/node_modules
+          key: backend-${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('backend/package-lock.json') }}
+          restore-keys: |
+            backend-${{ runner.os }}-node${{ matrix.node-version }}-
+
+      - name: Install backend dependencies
+        if: steps.cache-backend.outputs.cache-hit != 'true'
+        working-directory: ./backend
+        run: npm install --prefer-offline
+
+      - name: Run backend tests
+        working-directory: ./backend
+        run: npm run test:ci

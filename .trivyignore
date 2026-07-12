@@ -1,0 +1,4 @@
+# npm bundled dependency - no upgrade path from Dockerfile
+# undici is bundled inside npm itself at /usr/local/lib/node_modules/npm/node_modules/undici/
+# Fixed in undici 6.27.0 / 7.28.0 / 8.5.0 — waiting on npm to ship updated bundle
+CVE-2026-12151

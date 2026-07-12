@@ -1,0 +1,612 @@
+name: Deploy to Test Environment
+
+on:
+  push:
+    branches:
+      - development            # Push to development → deploys to TEST
+      - main                   # Push to main        → deploys to STAGING
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/workflows/*.yml'
+  pull_request:
+    branches:
+      - main
+      - development
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        default: 'test'
+        options:
+          - test
+          - staging
+          - production
+      skip-tests:
+        description: 'Skip post-deploy verification checks'
+        required: false
+        type: boolean
+        default: false
+      skip-e2e:
+        description: 'Skip pre-deploy E2E test gate'
+        required: false
+        type: boolean
+        default: false
+      skip-rollback:
+        description: 'Skip automatic rollback on verification failure'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # ── Determine which environment to deploy to ──
+  set-environment:
+    name: Set Deployment Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+    steps:
+      - name: Determine target environment
+        id: set-env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # On PRs base_ref is the target branch (main/development)
+            if [[ "${{ github.base_ref }}" == "main" ]]; then
+              echo "environment=staging" >> "$GITHUB_OUTPUT"
+            else
+              echo "environment=test" >> "$GITHUB_OUTPUT"
+            fi
+          elif [[ "${{ github.ref_name }}" == "production" ]]; then
+            echo "environment=production" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "environment=staging" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=test" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Print environment
+        run: echo "Deploying to ${{ steps.set-env.outputs.environment }}"
+
+  # ── Pre-Deploy E2E Test Gate ──
+  e2e-gate:
+    name: E2E Gate (${{ needs.set-environment.outputs.environment }})
+    needs: set-environment
+    if: |
+      ! (github.event_name == 'workflow_dispatch' && github.event.inputs.skip-e2e == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Cache frontend node_modules
+        uses: actions/cache@v4
+        id: cache-frontend-e2e
+        with:
+          path: frontend/node_modules
+          key: frontend-${{ runner.os }}-node20-deploy-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            frontend-${{ runner.os }}-node20-
+
+      - name: Install frontend dependencies
+        if: steps.cache-frontend-e2e.outputs.cache-hit != 'true'
+        working-directory: ./frontend
+        run: npm install --legacy-peer-deps --prefer-offline
+
+      - name: Install Playwright browsers
+        working-directory: ./frontend
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Build and start services (E2E config)
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml build --no-cache
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --wait --wait-timeout 120
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml ps
+
+      - name: Debug Docker containers (on failure)
+        if: failure()
+        run: |
+          echo "=== Container Status ==="
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml ps -a
+          echo "=== Backend Logs ==="
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml logs backend
+          echo "=== MongoDB Logs ==="
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml logs mongo
+
+      - name: Run E2E tests (via e2e-tests service)
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml run --rm e2e-tests
+
+      - name: Stop Docker Compose
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml down -v
+
+      - name: Upload E2E screenshots (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots-deploy-gate
+          path: frontend/test-results/**/*.png
+          retention-days: 7
+
+  # ── Build & Push Docker Images ───
+  build-and-push:
+    name: Build & Push (${{ needs.set-environment.outputs.environment }})
+    needs: [set-environment, e2e-gate]
+    if: |
+      always() &&
+      needs.set-environment.result == 'success' &&
+      (needs.e2e-gate.result == 'success' || needs.e2e-gate.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.set-environment.outputs.environment }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Determine image metadata ──
+      - name: Generate image metadata
+        id: meta
+        run: |
+          GIT_SHA="$(git rev-parse --short HEAD)"
+          echo "sha=${GIT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GIT_SHA}-$(date +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT"
+          echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      # ── Build & Push Backend ──
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.repo }}-backend:${{ steps.meta.outputs.sha }}
+            ghcr.io/${{ steps.meta.outputs.repo }}-backend:latest
+            ghcr.io/${{ steps.meta.outputs.repo }}-backend:${{ needs.set-environment.outputs.environment }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Build & Push Frontend ──
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:3000' }}
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.repo }}-frontend:${{ steps.meta.outputs.sha }}
+            ghcr.io/${{ steps.meta.outputs.repo }}-frontend:latest
+            ghcr.io/${{ steps.meta.outputs.repo }}-frontend:${{ needs.set-environment.outputs.environment }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Container Vulnerability Scans (Trivy) ──
+      # Non-blocking: Trivy failures must never block deploy
+      - name: Scan backend image
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ steps.meta.outputs.repo }}-backend:${{ steps.meta.outputs.sha }}
+          format: sarif
+          output: trivy-backend.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 0
+
+      - name: Upload backend scan results
+        if: always() && hashFiles('trivy-backend.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-backend.sarif
+          category: trivy-deploy-backend
+
+      - name: Scan frontend image
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ steps.meta.outputs.repo }}-frontend:${{ steps.meta.outputs.sha }}
+          format: sarif
+          output: trivy-frontend.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 0
+
+      - name: Upload frontend scan results
+        if: always() && hashFiles('trivy-frontend.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-frontend.sarif
+          category: trivy-deploy-frontend
+
+  # ── Production Approval Gate ──
+  approval-gate:
+    name: Production Approval Gate
+    needs: [set-environment, build-and-push]
+    if: |
+      always() &&
+      needs.set-environment.result == 'success' &&
+      needs.build-and-push.result == 'success' &&
+      needs.set-environment.outputs.environment == 'production'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    timeout-minutes: 60
+    steps:
+      - name: Await manual approval
+        run: |
+          echo "###  Production Deployment Awaiting Approval" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Triggered by | ${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "A reviewer must approve this deployment to continue."
+
+  # ── Deploy to Railway.app ────
+  deploy-railway:
+    name: Deploy Railway (${{ needs.set-environment.outputs.environment }})
+    needs: [set-environment, build-and-push, approval-gate]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.set-environment.outputs.environment }}
+    timeout-minutes: 15
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+    steps:
+      - name: Check out repository
+        if: env.RAILWAY_TOKEN != ''
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        if: env.RAILWAY_TOKEN != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Railway CLI
+        if: env.RAILWAY_TOKEN != ''
+        run: npm install -g @railway/cli
+
+      - name: Deploy backend to Railway
+        if: env.RAILWAY_TOKEN != ''
+        run: railway up --service=backend
+
+      - name: Deploy frontend to Railway
+        if: env.RAILWAY_TOKEN != ''
+        run: railway up --service=frontend
+
+      - name: Enforce replica minimums
+        if: env.RAILWAY_TOKEN != ''
+        run: |
+          railway service set --numReplicas 2 --service=backend
+          railway service set --numReplicas 2 --service=frontend
+
+      - name: Enable autoscaling (production only)
+        if: env.RAILWAY_TOKEN != '' && needs.set-environment.outputs.environment == 'production'
+        run: |
+          echo "Configuring autoscaling for production environment..."
+          railway service set --autoscaling-cpu 70 --autoscaling-memory 80 \
+            --autoscaling-min 2 --autoscaling-max 5 --service=backend
+          railway service set --autoscaling-cpu 70 --autoscaling-memory 80 \
+            --autoscaling-min 2 --autoscaling-max 5 --service=frontend
+
+  # ── Deploy to Target Host ────
+  deploy:
+    name: Deploy (${{ needs.set-environment.outputs.environment }})
+    needs: [set-environment, build-and-push, approval-gate]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.set-environment.outputs.environment }}
+    timeout-minutes: 15
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Generate image metadata
+        id: meta
+        run: |
+          echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy via SSH
+        if: env.DEPLOY_HOST != ''
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+
+            # ── Configuration ──
+            DEPLOY_PATH="/opt/brainbytes"
+            REPO="$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+            SHA="${{ steps.meta.outputs.sha }}"
+
+            echo "=== Deploying to ${{ needs.set-environment.outputs.environment }} ==="
+            echo "Image SHA: $SHA"
+            echo "Repository: $REPO"
+
+            cd "$DEPLOY_PATH" || { echo "ERROR: $DEPLOY_PATH not found"; exit 1; }
+
+            # ── Login to GHCR ──
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+              -u "${{ github.repository_owner }}" --password-stdin
+
+            # ── Pull images ──
+            echo "=== Pulling images ==="
+            docker pull "ghcr.io/${REPO}-backend:${{ needs.set-environment.outputs.environment }}"
+            docker pull "ghcr.io/${REPO}-frontend:${{ needs.set-environment.outputs.environment }}"
+
+            # ── Write .env file on remote ──
+            cat > .env << 'DOTENV'
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            HUGGINGFACE_TOKEN=${{ secrets.HUGGINGFACE_TOKEN }}
+            MONGODB_URI=${{ secrets.MONGODB_URI }}
+            NODE_ENV=${{ needs.set-environment.outputs.environment == 'staging' && 'staging' || 'test' }}
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:3000' }}
+            DOTENV
+
+            # ── Capture current stable images for rollback ──
+            echo "=== Capturing current stable images ==="
+            if command -v docker compose &>/dev/null; then
+              docker compose ps -q 2>/dev/null | head -1 > /dev/null && \
+                echo "ghcr.io/${REPO}-backend:${{ needs.set-environment.outputs.environment }}" > .last-stable-backend && \
+                echo "ghcr.io/${REPO}-frontend:${{ needs.set-environment.outputs.environment }}" > .last-stable-frontend && \
+                echo "Saved current stable image references" || \
+                echo "::warning::No running containers — skipping stable capture (first deploy?)"
+            else
+              docker-compose ps -q 2>/dev/null | head -1 > /dev/null && \
+                echo "ghcr.io/${REPO}-backend:${{ needs.set-environment.outputs.environment }}" > .last-stable-backend && \
+                echo "ghcr.io/${REPO}-frontend:${{ needs.set-environment.outputs.environment }}" > .last-stable-frontend && \
+                echo "Saved current stable image references" || \
+                echo "::warning::No running containers — skipping stable capture (first deploy?)"
+            fi
+
+            # ── Restart services ──
+            echo "=== Restarting services ==="
+            if command -v docker compose &>/dev/null; then
+              docker compose down --remove-orphans || true
+              docker compose up -d --wait --wait-timeout 120
+            else
+              docker-compose down --remove-orphans || true
+              docker-compose up -d
+            fi
+
+            # ── Update stable reference for next rollback ──
+            echo "ghcr.io/${REPO}-backend:${{ needs.set-environment.outputs.environment }}" > .last-stable-backend
+            echo "ghcr.io/${REPO}-frontend:${{ needs.set-environment.outputs.environment }}" > .last-stable-frontend
+            echo "Updated stable image references"
+
+            # ── Cleanup old images ──
+            echo "=== Pruning unused images ==="
+            docker image prune -af --filter "until=72h" || true
+
+            echo "=== Deployment complete ==="
+
+  # ── Verify Deployment ──
+  verify:
+    name: Verify (${{ needs.set-environment.outputs.environment }})
+    needs: [set-environment, deploy]
+    if: ${{ !inputs.skip-tests }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.set-environment.outputs.environment }}
+    timeout-minutes: 10
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install SSH client
+        run: sudo apt-get update && sudo apt-get install -y openssh-client
+
+      - name: Run composition smoke tests
+        if: env.DEPLOY_HOST != ''
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -e
+
+          SSH_OPTS="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
+          if [[ -n "$DEPLOY_SSH_KEY" ]]; then
+            echo "$DEPLOY_SSH_KEY" > /tmp/deploy_key
+            chmod 600 /tmp/deploy_key
+            SSH_OPTS="$SSH_OPTS -i /tmp/deploy_key"
+          fi
+
+          echo "=== Running composition verification ==="
+
+          # Copy test script to remote and run it
+          scp $SSH_OPTS ./test-composition.sh "$DEPLOY_USER@$DEPLOY_HOST:/tmp/test-composition.sh"
+          ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" 'bash /tmp/test-composition.sh'
+
+          # Cleanup
+          rm -f /tmp/deploy_key
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Deployment Verification Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Environment | ${{ needs.set-environment.outputs.environment }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Branch | ${{ github.ref_name }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Rollback (on verify failure) ──
+  rollback:
+    name: Rollback (${{ needs.set-environment.outputs.environment }})
+    needs: [set-environment, deploy, verify]
+    if: |
+      failure() &&
+      needs.verify.result == 'failure' &&
+      ! (github.event_name == 'workflow_dispatch' && github.event.inputs.skip-rollback == 'true')
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.set-environment.outputs.environment }}
+    timeout-minutes: 10
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Rollback via SSH
+        if: env.DEPLOY_HOST != ''
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script_stop: false
+          script: |
+            set -e
+
+            DEPLOY_PATH="/opt/brainbytes"
+            REPO="$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+
+            cd "$DEPLOY_PATH" || { echo "ERROR: $DEPLOY_PATH not found"; exit 1; }
+
+            echo "=== Rolling back ${{ needs.set-environment.outputs.environment }} ==="
+
+            # ── Read previous stable image references ──
+            if [[ -f .last-stable-backend ]] && [[ -f .last-stable-frontend ]]; then
+              PREV_BACKEND="$(cat .last-stable-backend)"
+              PREV_FRONTEND="$(cat .last-stable-frontend)"
+              echo "Previous stable backend:  $PREV_BACKEND"
+              echo "Previous stable frontend: $PREV_FRONTEND"
+            else
+              echo "::warning::No .last-stable file found — nothing to roll back (initial deployment?)"
+              exit 0
+            fi
+
+            if [[ -z "$PREV_BACKEND" ]] || [[ -z "$PREV_FRONTEND" ]]; then
+              echo "::warning::Rollback skipped: No previous stable image exists (initial deployment)."
+              exit 0
+            fi
+
+            # ── Login to GHCR ──
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+              -u "${{ github.repository_owner }}" --password-stdin
+
+            # ── Pull previous stable images ──
+            echo "=== Pulling previous stable images ==="
+            docker pull "$PREV_BACKEND"
+            docker pull "$PREV_FRONTEND"
+
+            # ── Re-tag as environment tags ──
+            echo "=== Re-tagging as environment images ==="
+            ENV="${{ needs.set-environment.outputs.environment }}"
+            docker tag "$PREV_BACKEND" "ghcr.io/${REPO}-backend:${ENV}"
+            docker tag "$PREV_FRONTEND" "ghcr.io/${REPO}-frontend:${ENV}"
+
+            # ── Restart services with previous images ──
+            echo "=== Restarting services with rollback images ==="
+            if command -v docker compose &>/dev/null; then
+              docker compose down --remove-orphans || true
+              docker compose up -d --wait --wait-timeout 120
+            else
+              docker-compose down --remove-orphans || true
+              docker-compose up -d
+            fi
+
+            # ── Update stable references (these are now current again) ──
+            echo "$PREV_BACKEND" > .last-stable-backend
+            echo "$PREV_FRONTEND" > .last-stable-frontend
+
+            echo "=== Rollback complete — previous stable images restored ==="
+
+  # ── Notify ──
+  notify:
+    name: Notify (${{ needs.set-environment.outputs.environment }})
+    needs: [set-environment, e2e-gate, deploy, deploy-railway, verify, rollback]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
+
+    steps:
+      - name: Send deployment notification
+        if: env.NOTIFY_EMAIL != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "[BrainBytes] Deployment to ${{ needs.set-environment.outputs.environment }} — ${{ needs.deploy.result == 'success' && 'SUCCESS' || 'FAILED' }}"
+          to: ${{ secrets.NOTIFY_EMAIL }}
+          from: BrainBytes CI
+          body: |
+            Deployment to **${{ needs.set-environment.outputs.environment }}** has completed.
+
+            | Field           | Value                                    |
+            |-----------------|------------------------------------------|
+            | Branch          | `${{ github.ref_name }}`                 |
+            | Commit          | `${{ github.sha }}`                      |
+            | Environment     | ${{ needs.set-environment.outputs.environment }} |
+            | E2E Gate        | ${{ needs.e2e-gate.result }}             |
+            | Build           | ${{ needs.build-and-push.result }}        |
+            | Deploy (SSH)    | ${{ needs.deploy.result }}                |
+            | Deploy (Railway)| ${{ needs.deploy-railway.result }}        |
+            | Verify          | ${{ needs.verify.result }}                |
+            | Rollback        | ${{ needs.rollback.result }}              |
+            | Triggered by    | ${{ github.actor }}                      |
+
+            **Workflow URL:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+

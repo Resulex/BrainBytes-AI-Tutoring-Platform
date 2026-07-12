@@ -1,0 +1,52 @@
+# Multi-stage build for container optimization
+# Stage 1: Install production dependencies
+FROM node:20-alpine AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /usr/src/app
+COPY package*.json ./
+RUN for i in $(seq 1 3); do \
+        npm install --production && \
+        break || sleep 10; \
+    done && \
+    npm cache clean --force
+
+# Stage 2: Production image
+FROM node:20-alpine AS runner
+WORKDIR /usr/src/app
+
+# Upgrade Alpine packages (patch OS CVEs like libcrypto3/libssl3)
+# and upgrade npm to patch CVEs in bundled npm deps
+# Retry loops handle transient I/O errors from Alpine CDN / npm registry in CI
+RUN for i in $(seq 1 5); do \
+        apk update && \
+        apk upgrade && \
+        break || sleep 10; \
+    done && \
+    rm -rf /var/cache/apk/* && \
+    for i in $(seq 1 5); do \
+        npm install -g npm@latest && \
+        break || sleep 10; \
+    done && \
+    npm cache clean --force
+
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 appuser
+
+# Copy only production dependencies from deps stage
+COPY --from=deps /usr/src/app/node_modules ./node_modules
+COPY . .
+
+# Set proper permissions
+RUN chown -R appuser:nodejs /usr/src/app
+
+USER appuser
+
+EXPOSE 3000
+EXPOSE 9080
+
+# Health check (uses built-in Node.js — no extra packages needed)
+HEALTHCHECK --interval=15s --timeout=10s --start-period=40s --retries=5 \
+  CMD node -e "require('http').get('http://localhost:3000/health',r=>{process.exit(r.statusCode===200?0:1)})"
+
+CMD ["node", "server.js"]

@@ -1,0 +1,11 @@
+# Dependencies
+**/node_modules/**
+# **/package-lock.json
+.env
+
+# Test artifacts
+**/coverage/
+**/playwright-report/
+**/test-results/
+backend/tests/performance/summary.json
+frontend/test-results/

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://docs.railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE"
+  },
+  "deploy": {
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 5,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 5
+  },
+  "services": {
+    "backend": {
+      "build": {
+        "dockerfilePath": "./backend/Dockerfile"
+      },
+      "deploy": {
+        "numReplicas": 2,
+        "healthcheckPath": "/health",
+        "healthcheckTimeout": 5,
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 5,
+        "autoscaling": {
+          "cpuThreshold": 70,
+          "memoryThreshold": 80,
+          "minReplicas": 2,
+          "maxReplicas": 5
+        }
+      }
+    },
+    "frontend": {
+      "build": {
+        "dockerfilePath": "./frontend/Dockerfile"
+      },
+      "deploy": {
+        "numReplicas": 2,
+        "healthcheckPath": "/api/health",
+        "healthcheckTimeout": 10,
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 5,
+        "autoscaling": {
+          "cpuThreshold": 70,
+          "memoryThreshold": 80,
+          "minReplicas": 2,
+          "maxReplicas": 5
+        }
+      }
+    }
+  }
+}

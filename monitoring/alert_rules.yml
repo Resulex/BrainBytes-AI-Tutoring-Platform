@@ -1,0 +1,260 @@
+groups:
+  # ═══════════════════════════════════════════════════════════════
+  # Group 1: Infrastructure & Health
+  # ═══════════════════════════════════════════════════════════════
+  - name: brainbytes_infrastructure
+    rules:
+      # 1.1 – Any scrape target goes down
+      - alert: InstanceDown
+        expr: up{job=~"brainbytes-backend|node-exporter|cadvisor"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "{{ $labels.job }} ({{ $labels.instance }}) is down"
+          description: >
+            The scrape target {{ $labels.instance }} for job {{ $labels.job }}
+            has been unreachable for more than 1 minute.
+          runbook: >
+            1. Check that the container/service is running: docker-compose ps
+            2. Inspect container logs: docker logs <container>
+            3. Verify network connectivity: docker network inspect app-network
+
+      # 1.2 – Prometheus self-monitoring failure
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "Prometheus self-monitoring target is down"
+          description: >
+            Prometheus cannot scrape its own /metrics endpoint.
+            This usually indicates the Prometheus container has crashed.
+          runbook: >
+            1. docker ps | grep prometheus — is it running?
+            2. docker logs prometheus — check for config errors or OOM kills
+            3. docker restart prometheus
+
+  # ═══════════════════════════════════════════════════════════════
+  # Group 2: Application Error Budget
+  # ═══════════════════════════════════════════════════════════════
+  - name: brainbytes_errors
+    rules:
+      # 2.1 – Elevated 5xx error rate (warning threshold)
+      - alert: HighHTTP5xxRate
+        expr: |
+          sum(rate(brainbytes_http_requests_total{status=~"5.."}[5m]))
+          /
+          sum(rate(brainbytes_http_requests_total[5m]))
+          > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          category: application
+        annotations:
+          summary: "High 5xx error rate: {{ $value | humanizePercentage }}"
+          description: >
+            The global 500-class error ratio has exceeded 5% for 3 minutes
+            (current value: {{ $value | humanizePercentage }}).
+          runbook: >
+            1. Check backend logs: docker logs brainbytes-backend
+            2. Review /api/messages errors — is AI service returning 500s?
+            3. Verify MongoDB connectivity
+            4. If error-spikes scenario is running, this is expected
+
+      # 2.2 – Critical 5xx error rate (escalated)
+      - alert: CriticalHTTP5xxRate
+        expr: |
+          sum(rate(brainbytes_http_requests_total{status=~"5.."}[5m]))
+          /
+          sum(rate(brainbytes_http_requests_total[5m]))
+          > 0.20
+        for: 1m
+        labels:
+          severity: critical
+          category: application
+        annotations:
+          summary: "CRITICAL: 5xx error rate at {{ $value | humanizePercentage }}"
+          description: >
+            Over 20% of HTTP requests are failing with 5xx errors.
+            Immediate investigation required.
+          runbook: >
+            1. Check all dependent services (AI, MongoDB, HuggingFace)
+            2. Roll back recent deployment if applicable
+            3. Escalate to on-call engineer
+
+      # 2.3 – AI service returning errors
+      - alert: AIServiceHighErrors
+        expr: rate(brainbytes_ai_request_errors_total[5m]) > 0.02
+        for: 3m
+        labels:
+          severity: warning
+          category: ai-service
+        annotations:
+          summary: "AI error rate elevated: {{ $value }} req/s"
+          description: >
+            AI errors ({{ $labels.error_type }}) for model {{ $labels.model }}
+            at {{ $value }} req/s. Affects tutoring response quality.
+          runbook: >
+            1. Check HUGGINGFACE_TOKEN validity and quota
+            2. Verify connectivity: curl -I https://api-inference.huggingface.co
+            3. If error_type=timeout, check model latency
+            4. If error_type=auth_failure, rotate the API token
+
+  # ═══════════════════════════════════════════════════════════════
+  # Group 3: Latency & Performance
+  # ═══════════════════════════════════════════════════════════════
+  - name: brainbytes_latency
+    rules:
+      # 3.1 – AI response P99 exceeding 10 seconds
+      - alert: AIServiceHighLatency
+        expr: |
+          brainbytes:ai_response_latency_p99:histogram_quantile5m > 10
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "AI P99 latency > 10s: {{ $value }}s"
+          description: >
+            99th percentile AI call duration has exceeded 10 seconds.
+            Users will experience slow or hanging responses.
+          runbook: >
+            1. Check HuggingFace model availability
+            2. Verify per-model latencies:
+               rate(brainbytes_ai_request_duration_seconds_sum[5m]) by (model)
+            3. Consider switching to a faster model or adding caching
+            4. If under high-load scenario, this is expected behavior
+
+      # 3.2 – Overall /api/messages P95 latency spike
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(brainbytes_http_request_duration_seconds_bucket{
+              endpoint="/api/messages"
+            }[5m])
+          ) > 5
+        for: 3m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "P95 /api/messages latency > 5s: {{ $value }}s"
+          description: >
+            95% of /api/messages requests take longer than 5 seconds.
+            AI latency is the primary suspect.
+          runbook: >
+            1. Cross-reference with AIServiceHighLatency alert
+            2. Check event loop lag: nodejs_eventloop_lag_seconds
+            3. Are we under high concurrency? Check brainbytes_online_users
+            4. Review MongoDB query performance if applicable
+
+  # ═══════════════════════════════════════════════════════════════
+  # Group 4: Resource Saturation
+  # ═══════════════════════════════════════════════════════════════
+  - name: brainbytes_saturation
+    rules:
+      # 4.1 – High CPU utilization
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by (instance)
+            (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "CPU utilization > 80%: {{ $value }}%"
+          description: >
+            Host CPU above 80% for 5 minutes on {{ $labels.instance }}.
+            Response times may degrade.
+          runbook: >
+            1. Check top container CPU:
+               sum by (name) (rate(container_cpu_usage_seconds_total[5m]))
+            2. Is the high-load scenario running?
+            3. Consider scaling horizontally or increasing CPU allocation
+
+      # 4.2 – High memory usage (pre-OOM warning)
+      - alert: HighMemoryUsage
+        expr: |
+          (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+          / node_memory_MemTotal_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "Memory usage > 85%: {{ $value | humanizePercentage }}"
+          description: >
+            Host memory usage exceeded 85% for 5 minutes. Risk of OOM kills.
+          runbook: >
+            1. Identify top consumers:
+               sum by (name) (container_memory_usage_bytes)
+            2. Check for memory leaks: growing brainbytes_active_sessions
+               combined with rising container_memory_usage_bytes
+            3. Is resource-constraint scenario running?
+            4. If isolated to backend, check for unbounded arrays/caches
+
+  # ═══════════════════════════════════════════════════════════════
+  # Group 5: Application-Specific Signals
+  # ═══════════════════════════════════════════════════════════════
+  - name: brainbytes_application
+    rules:
+      # 5.1 – Session leak / stuck sessions
+      - alert: SessionLeakWarning
+        expr: brainbytes_active_sessions > 10
+        for: 10m
+        labels:
+          severity: warning
+          category: application
+        annotations:
+          summary: "Active sessions elevated: {{ $value }} for 10+ minutes"
+          description: >
+            Active sessions have stayed above 10 for more than 10 minutes
+            without decreasing. May indicate orphaned sessions or a leak.
+          runbook: >
+            1. Cross-check with brainbytes_online_users — are users connected?
+            2. Check MongoDB: db.sessions.countDocuments({ isActive: true })
+            3. If resource-constraint scenario is running, this is expected
+            4. Otherwise investigate disconnect event handling
+
+      # 5.2 – Gauge mismatch (messages flowing but gauge at zero)
+      - alert: SessionGaugeMismatch
+        expr: |
+          brainbytes_active_sessions == 0
+          and
+          rate(brainbytes_messages_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: info
+          category: application
+        annotations:
+          summary: "Messages flowing but active sessions gauge is zero"
+          description: >
+            Chat messages are being processed but active sessions gauge
+            reports zero. Observability pipeline may be broken.
+          runbook: >
+            1. Verify incrementActiveSessions/decrementActiveSessions calls
+            2. Check if all session creation paths increment the gauge
+            3. No user impact, but monitoring is degraded
+
+      # 5.3 – Node.js event loop blockage
+      - alert: EventLoopLag
+        expr: nodejs_eventloop_lag_seconds{job="brainbytes-backend"} > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Event loop lag > 50ms for 3 minutes"
+          description: >
+            The Node.js event loop has been blocked for > 50ms on average.
+            All endpoints experience delayed responses.
+          runbook: >
+            1. Look for synchronous operations in request handlers
+            2. Check for sync file I/O, large JSON ops, or blocking AI calls
+            3. Review recent code changes for CPU-intensive sync code
+            4. CPU profiling may be needed: node --inspect or clinic.js

@@ -1,0 +1,22 @@
+# Dockerfile for running Playwright E2E tests in CI
+FROM mcr.microsoft.com/playwright:latest
+
+WORKDIR /usr/src/app
+
+# Install Node.js dependencies (with retry for transient npm registry errors)
+COPY package*.json ./
+RUN for i in $(seq 1 3); do \
+        npm ci && \
+        break || sleep 10; \
+    done
+
+# Install Playwright browsers matching the installed version (both chromium & firefox)
+RUN npx playwright install --with-deps chromium firefox
+
+# Copy test files
+COPY e2e/ ./e2e/
+
+# Copy playwright config to WORKDIR root (Playwright looks in CWD)
+COPY e2e/playwright.config.js ./playwright.config.js
+
+CMD ["npx", "playwright", "test", "--reporter=html,json,junit"]

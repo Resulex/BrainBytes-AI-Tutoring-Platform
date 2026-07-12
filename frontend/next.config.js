@@ -1,0 +1,40 @@
+module.exports = {
+  // Rewrite Railway health check to API route
+  async rewrites() {
+    return [
+      {
+        source: '/health',
+        destination: '/api/health',
+      },
+    ];
+  },
+  // Enable PWA features
+  headers: async () => [
+    {
+      source: '/sw.js',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, max-age=0, must-revalidate',
+        },
+        {
+          key: 'Service-Worker-Allowed',
+          value: '/',
+        },
+      ],
+    },
+    {
+      source: '/manifest.json',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, max-age=3600',
+        },
+      ],
+    },
+  ],
+  // Disable X-Powered-By header
+  poweredByHeader: false,
+  // Enable React strict mode
+  reactStrictMode: true,
+};
