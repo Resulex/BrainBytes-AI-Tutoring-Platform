@@ -6,7 +6,7 @@ groups:
     rules:
       # 1.1 – Any scrape target goes down
       - alert: InstanceDown
-        expr: up{job=~"brainbytes-backend|node-exporter|cadvisor"} == 0
+        expr: up{job=~"brainbytes-backend|brainbytes-frontend|node-exporter|cadvisor"} == 0
         for: 1m
         labels:
           severity: critical
@@ -241,7 +241,7 @@ groups:
             2. Check if all session creation paths increment the gauge
             3. No user impact, but monitoring is degraded
 
-      # 5.3 – Node.js event loop blockage
+      # 5.3 – Node.js event loop blockage (WARNING)
       - alert: EventLoopLag
         expr: nodejs_eventloop_lag_seconds{job="brainbytes-backend"} > 0.05
         for: 3m
@@ -253,8 +253,358 @@ groups:
           description: >
             The Node.js event loop has been blocked for > 50ms on average.
             All endpoints experience delayed responses.
-          runbook: >
-            1. Look for synchronous operations in request handlers
-            2. Check for sync file I/O, large JSON ops, or blocking AI calls
-            3. Review recent code changes for CPU-intensive sync code
-            4. CPU profiling may be needed: node --inspect or clinic.js
+          runbook: "See runbooks.md#EventLoopLag"
+
+      # 5.4 – Event loop critical threshold (CRITICAL)
+      - alert: EventLoopCritical
+        expr: nodejs_eventloop_lag_seconds{job="brainbytes-backend"} > 0.25
+        for: 2m
+        labels:
+          severity: critical
+          category: performance
+        annotations:
+          summary: "CRITICAL: Event loop lag > 250ms for 2 minutes"
+          description: >
+            The Node.js event loop is severely blocked (>250ms).
+            Service is effectively degraded — users will experience timeouts.
+          runbook: "See runbooks.md#EventLoopCritical"
+
+      # 5.5 – Session count anomaly
+      - alert: SessionDropAnomaly
+        expr: |
+          brainbytes_active_sessions == 0
+          and
+          sum(rate(brainbytes_http_requests_total{endpoint="/api/messages"}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: application
+        annotations:
+          summary: "Active sessions dropped to zero while /api/messages has traffic"
+          description: >
+            Chat messages are flowing but the active sessions gauge is zero.
+            Observability pipeline may be broken.
+          runbook: "See runbooks.md#SessionDropAnomaly"
+
+      # 5.6 – High session churn
+      - alert: HighSessionChurn
+        expr: |
+          rate(brainbytes_active_sessions[10m]) > 5
+          or
+          rate(brainbytes_active_sessions[10m]) < -5
+        for: 5m
+        labels:
+          severity: warning
+          category: application
+        annotations:
+          summary: "Unusual session churn detected: {{ $value }}/s change rate"
+          description: >
+            Sessions connecting/disconnecting at unusually high rate.
+            May indicate frontend reconnect loops or network instability.
+          runbook: "See runbooks.md#HighSessionChurn"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Group 6: Layered Saturation (early WARNING thresholds + CRITICAL)
+  # ═══════════════════════════════════════════════════════════════
+  - name: brainbytes_saturation_layered
+    rules:
+      # 6.1 – CPU WARNING (50-80%)
+      - alert: CPUUsageWarning
+        expr: |
+          100 - (avg by (instance)
+            (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 50
+        for: 10m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "CPU usage elevated > 50% for 10 min: {{ $value }}%"
+          description: >
+            Host CPU consistently above 50%. Reduced headroom for spikes.
+          runbook: "See runbooks.md#CPUUsageWarning"
+
+      # 6.2 – Memory WARNING (60-85%)
+      - alert: MemoryUsageWarning
+        expr: |
+          (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+          / node_memory_MemTotal_bytes > 0.60
+        for: 10m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "Memory usage elevated > 60% for 10 min: {{ $value | humanizePercentage }}"
+          description: >
+            Host memory above 60% for 10 minutes. Memory pressure building.
+          runbook: "See runbooks.md#MemoryUsageWarning"
+
+      # 6.3 – Disk space warning
+      - alert: DiskSpaceWarning
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"}
+          / node_filesystem_size_bytes{mountpoint="/"}) < 0.20
+        for: 5m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "Disk space < 20% available on {{ $labels.instance }}"
+          description: >
+            Root filesystem has less than 20% free space.
+          runbook: "See runbooks.md#DiskSpaceWarning"
+
+      # 6.4 – Disk space critical
+      - alert: DiskSpaceCritical
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"}
+          / node_filesystem_size_bytes{mountpoint="/"}) < 0.10
+        for: 1m
+        labels:
+          severity: critical
+          category: capacity
+        annotations:
+          summary: "CRITICAL: Disk space < 10% on {{ $labels.instance }}"
+          description: >
+            Immediate risk of service failure due to disk exhaustion.
+          runbook: "See runbooks.md#DiskSpaceCritical"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Group 7: Business-Level & User Experience
+  # ═══════════════════════════════════════════════════════════════
+  - name: brainbytes_business
+    rules:
+      # 7.1 – AI response time degradation (WARNING)
+      - alert: AIResponseDegradationWarning
+        expr: |
+          brainbytes:ai_response_latency_p99:histogram_quantile5m > 15
+        for: 5m
+        labels:
+          severity: warning
+          category: ai-service
+        annotations:
+          summary: "AI P99 latency degraded > 15s: {{ $value }}s"
+          description: >
+            AI response P99 latency crossed 15 seconds. Tutor feels sluggish.
+          runbook: "See runbooks.md#AIResponseDegradationWarning"
+
+      # 7.2 – AI response time CRITICAL
+      - alert: AIResponseDegradationCritical
+        expr: |
+          brainbytes:ai_response_latency_p99:histogram_quantile5m > 30
+        for: 3m
+        labels:
+          severity: critical
+          category: ai-service
+        annotations:
+          summary: "CRITICAL: AI P99 latency > 30s: {{ $value }}s"
+          description: >
+            AI responses taking over 30 seconds at P99. Users will abandon sessions.
+          runbook: "See runbooks.md#AIResponseDegradationCritical"
+
+      # 7.3 – Zero AI success rate
+      - alert: AICompleteFailure
+        expr: |
+          sum(rate(brainbytes_ai_request_errors_total[5m])) > 0
+          and
+          sum(rate(brainbytes_ai_request_duration_seconds_count[5m])) == 0
+        for: 3m
+        labels:
+          severity: critical
+          category: ai-service
+        annotations:
+          summary: "All AI requests failing — zero successful calls"
+          description: >
+            Every AI request is returning an error. Users cannot receive tutoring.
+          runbook: "See runbooks.md#AICompleteFailure"
+
+      # 7.4 – Request rate anomaly
+      - alert: RequestRateAnomaly
+        expr: |
+          abs(
+            sum(rate(brainbytes_http_requests_total[5m]))
+            -
+            sum(rate(brainbytes_http_requests_total[30m] offset 10m))
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+          category: application
+        annotations:
+          summary: "Unusual traffic pattern: request rate anomaly detected"
+          description: >
+            Current request rate deviates significantly from 30-min baseline.
+          runbook: "See runbooks.md#RequestRateAnomaly"
+
+      # 7.5 – Low success rate
+      - alert: LowSuccessRate
+        expr: |
+          sum(rate(brainbytes_http_requests_total{status=~"2.."}[5m]))
+          /
+          sum(rate(brainbytes_http_requests_total[5m])) < 0.90
+        for: 5m
+        labels:
+          severity: warning
+          category: application
+        annotations:
+          summary: "Success rate below 90%: {{ $value | humanizePercentage }}"
+          description: >
+            More than 10% of users are experiencing errors.
+          runbook: "See runbooks.md#LowSuccessRate"
+
+      # 7.6 – No user activity
+      - alert: NoUserActivity
+        expr: |
+          sum(rate(brainbytes_http_requests_total[10m])) == 0
+        for: 10m
+        labels:
+          severity: info
+          category: application
+        annotations:
+          summary: "Zero HTTP requests in the last 10 minutes"
+          description: >
+            No incoming traffic. Off-peak or frontend unreachable.
+          runbook: "See runbooks.md#NoUserActivity"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Group 8: Frontend Health
+  # ═══════════════════════════════════════════════════════════════
+  - name: brainbytes_frontend
+    rules:
+      - alert: FrontendDown
+        expr: up{job="brainbytes-frontend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "Frontend service ({{ $labels.instance }}) is down"
+          description: >
+            Prometheus cannot reach the frontend /api/metrics endpoint.
+          runbook: "See runbooks.md#FrontendDown"
+
+      - alert: FrontendHighErrors
+        expr: |
+          sum(rate(brainbytes_http_requests_total{job="brainbytes-frontend",status=~"5.."}[5m])) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          category: application
+        annotations:
+          summary: "Frontend returning 5xx errors: {{ $value }} req/s"
+          description: Next.js server returning 500-class errors.
+          runbook: "See runbooks.md#FrontendHighErrors"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Group 9: Database Health
+  # ═══════════════════════════════════════════════════════════════
+  - name: brainbytes_database
+    rules:
+      - alert: MongoDBDown
+        expr: |
+          absent(container_memory_usage_bytes{name=~"mongo|brainbytes-mongo.*"})
+        for: 1m
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "MongoDB container is not running"
+          description: All API operations will fail without the database.
+          runbook: "See runbooks.md#MongoDBDown"
+
+      - alert: MongoDBHighMemory
+        expr: |
+          container_memory_usage_bytes{name=~"mongo|brainbytes-mongo.*"}
+          / 1073741824 > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "MongoDB using > 85% of 1GB limit: {{ $value | humanizePercentage }}"
+          description: Risk of OOM kill and database crash.
+          runbook: "See runbooks.md#MongoDBHighMemory"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Recording Rules
+  # ═══════════════════════════════════════════════════════════════
+  - name: brainbytes_recording_rules
+    interval: 30s
+    rules:
+      - record: brainbytes:ai_response_latency_p99:histogram_quantile5m
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(brainbytes_ai_request_duration_seconds_bucket[5m])) by (le))
+
+      - record: brainbytes:global_request_rate:rate1m
+        expr: sum(rate(brainbytes_http_requests_total[1m]))
+
+      - record: brainbytes:error_ratio_5xx:ratio5m
+        expr: |
+          sum(rate(brainbytes_http_requests_total{status=~"5.."}[5m]))
+          /
+          sum(rate(brainbytes_http_requests_total[5m]))
+
+      - record: brainbytes:endpoint_5xx_rate:rate5m
+        expr: |
+          sum(rate(brainbytes_http_requests_total{status=~"5.."}[5m])) by (endpoint)
+
+      - record: brainbytes:api_latency_p50:histogram_quantile5m
+        expr: |
+          histogram_quantile(0.50,
+            sum(rate(brainbytes_http_request_duration_seconds_bucket[5m])) by (le))
+      - record: brainbytes:api_latency_p95:histogram_quantile5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(brainbytes_http_request_duration_seconds_bucket[5m])) by (le))
+      - record: brainbytes:api_latency_p99:histogram_quantile5m
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(brainbytes_http_request_duration_seconds_bucket[5m])) by (le))
+
+      - record: brainbytes:container_cpu_percent:rate5m
+        expr: rate(container_cpu_usage_seconds_total[5m]) * 100
+
+# ═══════════════════════════════════════════════════════════════════
+# Alert Inhibition Rules
+# ═══════════════════════════════════════════════════════════════════
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['job', 'instance']
+
+  - source_match:
+      alertname: 'CriticalHTTP5xxRate'
+    target_match:
+      alertname: 'HighHTTP5xxRate'
+
+  - source_match:
+      alertname: 'AICompleteFailure'
+    target_match:
+      alertname: 'AIServiceHighErrors'
+
+  - source_match:
+      alertname: 'AIResponseDegradationCritical'
+    target_match:
+      alertname: 'AIResponseDegradationWarning'
+
+  - source_match:
+      alertname: 'HighMemoryUsage'
+    target_match:
+      alertname: 'MemoryUsageWarning'
+
+  - source_match:
+      alertname: 'EventLoopCritical'
+    target_match:
+      alertname: 'EventLoopLag'
+
+  - source_match:
+      alertname: 'FrontendDown'
+    target_match:
+      alertname: 'FrontendHighErrors'
+
+  - source_match:
+      alertname: 'MongoDBDown'
+    target_match:
+      alertname: 'MongoDBHighMemory'

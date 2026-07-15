@@ -145,10 +145,33 @@ services:
       - app-network
     restart: unless-stopped
 
+  # --- GRAFANA DASHBOARD ---
+  grafana:
+    image: grafana/grafana:9.5.2
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=brainbytes
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./monitoring/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
+      - ./monitoring/dashboards:/etc/grafana/dashboards
+    networks:
+      - app-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
 # Define volumes for persistent data
 volumes:
   mongo-data:
   prometheus_data:
+  grafana_data:
 
 networks:
   app-network:
