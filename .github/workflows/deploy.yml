@@ -184,10 +184,6 @@ jobs:
         if: env.RAILWAY_TOKEN != ''
         uses: actions/checkout@v4
 
-      - name: Install Railway CLI
-        if: env.RAILWAY_TOKEN != ''
-        run: npm install -g @railway/cli
-
       - name: Deploy backend to Railway
         if: env.RAILWAY_TOKEN != ''
         env:
@@ -197,7 +193,7 @@ jobs:
           for i in 0 1 2; do
             ATTEMPT=$((i + 1))
             echo "Attempt $ATTEMPT: Deploying backend to Railway (production)..."
-            if railway up --service=backend --environment=production --detach; then
+            if npx @railway/cli up --service=backend --environment=production --detach; then
               echo "Backend uploaded successfully."
               break
             fi
@@ -219,7 +215,7 @@ jobs:
           for i in 0 1 2; do
             ATTEMPT=$((i + 1))
             echo "Attempt $ATTEMPT: Deploying frontend to Railway (production)..."
-            if railway up --service=frontend --environment=production --detach; then
+            if npx @railway/cli up --service=frontend --environment=production --detach; then
               echo "Frontend uploaded successfully."
               break
             fi
