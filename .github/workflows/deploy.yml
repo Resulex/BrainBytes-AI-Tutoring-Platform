@@ -180,6 +180,7 @@ jobs:
     timeout-minutes: 15
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
 
     steps:
       - name: Check out repository
@@ -196,10 +197,17 @@ jobs:
         if: env.RAILWAY_TOKEN != ''
         run: npm install -g @railway/cli
 
-      - name: Link Railway project
+      - name: Verify Railway token
         if: env.RAILWAY_TOKEN != ''
-        env:
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        run: |
+          echo "Checking Railway authentication..."
+          railway whoami || {
+            echo "::error::RAILWAY_TOKEN is invalid or expired."
+            exit 1
+          }
+
+      - name: Link Railway project
+        if: env.RAILWAY_TOKEN != '' && env.RAILWAY_PROJECT_ID != ''
         run: railway link --project="$RAILWAY_PROJECT_ID" --environment=production
 
       - name: Deploy backend to Railway
