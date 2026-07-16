@@ -105,6 +105,14 @@ jobs:
         working-directory: ./frontend
         run: npm run test:ci
 
+      - name: Upload JUnit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-frontend-fast-node-${{ matrix.node-version }}
+          path: frontend/coverage/junit.xml
+          retention-days: 7
+
   # ─── BACKEND UNIT TESTS ───
   test-backend:
     name: Backend Tests (Node ${{ matrix.node-version }})
@@ -143,3 +151,41 @@ jobs:
       - name: Run backend tests
         working-directory: ./backend
         run: npm run test:ci
+
+      - name: Upload JUnit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-backend-fast-node-${{ matrix.node-version }}
+          path: backend/coverage/junit.xml
+          retention-days: 7
+
+  # ─── REPORT ───
+  report:
+    name: Test Results
+    needs: [test-frontend, test-backend]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Download frontend JUnit (Node 20)
+        uses: actions/download-artifact@v4
+        with:
+          name: junit-frontend-fast-node-20
+          path: test-results/junit/
+        continue-on-error: true
+
+      - name: Download backend JUnit (Node 20)
+        uses: actions/download-artifact@v4
+        with:
+          name: junit-backend-fast-node-20
+          path: test-results/junit/
+        continue-on-error: true
+
+      - name: Publish unit test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: "test-results/junit/*.xml"
+          comment_mode: off
