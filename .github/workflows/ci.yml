@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main, development ]
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   # ─── CODE QUALITY (lint + format) ───
   lint:
@@ -105,6 +109,14 @@ jobs:
         working-directory: ./frontend
         run: npm run test:ci
 
+      - name: Upload JUnit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-frontend-fast-node-${{ matrix.node-version }}
+          path: frontend/coverage/junit.xml
+          retention-days: 7
+
   # ─── BACKEND UNIT TESTS ───
   test-backend:
     name: Backend Tests (Node ${{ matrix.node-version }})
@@ -143,3 +155,53 @@ jobs:
       - name: Run backend tests
         working-directory: ./backend
         run: npm run test:ci
+
+      - name: Upload JUnit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-backend-fast-node-${{ matrix.node-version }}
+          path: backend/coverage/junit.xml
+          retention-days: 7
+
+  # ─── REPORT ───
+  report:
+    name: Test Results
+    needs: [test-frontend, test-backend]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Download frontend JUnit (Node 20)
+        uses: actions/download-artifact@v4
+        with:
+          name: junit-frontend-fast-node-20
+          path: test-results/junit/
+        continue-on-error: true
+
+      - name: Download backend JUnit (Node 20)
+        uses: actions/download-artifact@v4
+        with:
+          name: junit-backend-fast-node-20
+          path: test-results/junit/
+        continue-on-error: true
+
+      - name: Check for test results
+        id: check-results
+        run: |
+          if ls test-results/junit/*.xml 1>/dev/null 2>&1; then
+            echo "has_results=true" >> "$GITHUB_OUTPUT"
+            echo "Found JUnit XMLs:"
+            ls -la test-results/junit/*.xml
+          else
+            echo "has_results=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No JUnit XML files found — skipping test result publish"
+          fi
+
+      - name: Publish unit test results
+        if: steps.check-results.outputs.has_results == 'true'
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: "test-results/junit/*.xml"
+          comment_mode: off
