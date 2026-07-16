@@ -608,13 +608,25 @@ jobs:
           path: backend/tests/performance/
         continue-on-error: true
 
+      - name: Check for test results
+        id: check-results
+        run: |
+          if ls test-results/junit/*.xml 1>/dev/null 2>&1; then
+            echo "has_results=true" >> "$GITHUB_OUTPUT"
+            echo "Found JUnit XMLs:"
+            ls -la test-results/junit/*.xml
+          else
+            echo "has_results=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No JUnit XML files found — skipping test result publish"
+          fi
+
       - name: Generate test summary report
         run: node scripts/generate-summary.js
 
       # Publish merged JUnit results to GitHub Actions UI
       - name: Publish unit test results
+        if: steps.check-results.outputs.has_results == 'true'
         uses: EnricoMi/publish-unit-test-result-action@v2
-        if: always()
         with:
           files: "test-results/junit/*.xml"
           comment_mode: off
