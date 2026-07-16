@@ -1,0 +1,10 @@
+# False positives — PromQL expressions, not secrets
+generic-api-key:monitoring/alert_rules.yml:549
+generic-api-key:monitoring/alert_rules.yml:551
+generic-api-key:monitoring/alert_rules.yml:555
+generic-api-key:monitoring/alert_rules.yml:559
+
+# Exact fingerprints from gitleaks scan output
+fcfac429d05a7a639f127512aedd04b46bef3739:monitoring/alert_rules.yml:generic-api-key:551
+fcfac429d05a7a639f127512aedd04b46bef3739:monitoring/alert_rules.yml:generic-api-key:555
+fcfac429d05a7a639f127512aedd04b46bef3739:monitoring/alert_rules.yml:generic-api-key:559
