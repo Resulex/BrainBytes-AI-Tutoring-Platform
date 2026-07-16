@@ -20,10 +20,6 @@ BrainBytes is an AI-powered tutoring platform designed to provide accessible aca
 - Alex Resurreccion - Team Lead - lr.alresurreccion@mmdc.mcl.edu.ph
 - christenne jsele herrera - Backend Developer - 
 lr.cjherrera@mmdc.mcl.edu.ph
-- Harty Joy Villegas - Frontend Developer - 
-lr.hjvillegas@mmdc.mcl.edu.ph
-- Broose Henrik Membreve - DevOps Engineer - 
-lr.bhmembreve@mmdc.mcl.edu.ph
 
 ## Project Goals
 - Implement a containerized application with proper networking
@@ -510,6 +506,15 @@ Docker version 29.4.1, build 055a478
 - [CI/CD Implementation and Testing Documentation](https://docs.google.com/document/d/15Xo--sSDzwhhLpeyZmdhPw-qLuAiU1n-eYFgr0FbFkY/edit?usp=sharing)
 - [Deployment Plan Documentation](https://docs.google.com/document/d/15uaHOPKM--08Mhd5ZjJibSCVzGSw3QeDIC_z69zGdeM/edit?usp=sharing)
 - [Milestone 2 Documentation](https://docs.google.com/document/d/1JGmgXinJhcwiIrOKrD6c6GpZu-I6txaua_B3yKzxFrA/edit?usp=sharing)
+
+
+## Monitoring Documents Directory
+- [BrainBytes Dashboards - JSON file](https://drive.google.com/drive/folders/1r-i8CKsDfymlTeHVHrBwcfwtitcKvbzt?usp=sharing)
+- [BrainBytes Monitoring Advanced Dashboard](https://drive.google.com/drive/folders/1sqVuSoGaFP9AGqABA2Tsz97dU0B6uo5r?usp=sharing)
+- [BrainBytes Alert Configuration Documentation](https://docs.google.com/document/d/1O9xIjYCqjK0AlVje4cViyk45C6hV2E6Wctur1984QDI/edit?usp=sharing)
+- [BrainBytes Monitoring Demo Plan](https://docs.google.com/document/d/1xeDRW1RdHpdOWMpkVUIk5SQJt0KdmEY_FMY7_SKgp_c/edit?usp=sharing)
+- [BrainBytes Monitoring System and Advanced Dashboard Documentation](https://docs.google.com/document/d/1JlGy2X9Uyi_JKGiSRPdwQ72X8JmPdMfWCL_-oXtLorY/edit?usp=sharing)
+- [BrainBytes Monitoring System Documentation - Prometheus](https://docs.google.com/document/d/1j8BIOFXocZimIFqnOIYD4iBwv8BvNY7yFbYc8zhmrDY/edit?usp=sharing)
 
 ### Implemented and Addressed Items
 
