@@ -15,4 +15,3 @@ datasources:
     access: proxy
     uid: testdata
     editable: true
-    editable: true

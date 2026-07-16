@@ -5,6 +5,20 @@ services:
       - NEXT_PUBLIC_API_URL=http://backend:3000
     ports:
       - "8080:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://localhost:3000/health",
+        ]
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 15
 
   backend:
     environment:
@@ -12,6 +26,26 @@ services:
       - JWT_SECRET=brainbytes-e2e-test-secret
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-placeholder-for-e2e}
       - MONGODB_URI=mongodb://mongo:27017/brainbytes
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 15
+
+  mongo:
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'db.runCommand(\"ping\").ok' | mongo --quiet"]
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 15
 
   e2e-tests:
     build:
