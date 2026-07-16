@@ -1,0 +1,3 @@
+# False positives — PromQL expressions, not secrets
+generic-api-key:monitoring/alert_rules.yml:549
+generic-api-key:monitoring/alert_rules.yml:551

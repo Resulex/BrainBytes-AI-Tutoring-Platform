@@ -9,6 +9,7 @@
  */
 
 const http = require('http');
+const { randomInt } = require('crypto');
 
 const BASE_PORT = 3000;
 const HOST = 'localhost';
@@ -48,7 +49,7 @@ function request(method, path, body = null) {
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const rand = (min, max) => randomInt(min, max + 1);
 
 // ── main ─────────────────────────────────────────────────────────────
 async function run() {
