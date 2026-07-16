@@ -196,6 +196,12 @@ jobs:
         if: env.RAILWAY_TOKEN != ''
         run: npm install -g @railway/cli
 
+      - name: Link Railway project
+        if: env.RAILWAY_TOKEN != ''
+        env:
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        run: railway link --project="$RAILWAY_PROJECT_ID" --environment=production
+
       - name: Deploy backend to Railway
         if: env.RAILWAY_TOKEN != ''
         run: |
@@ -239,20 +245,8 @@ jobs:
             fi
           done
 
-      - name: Enforce replica minimums
-        if: env.RAILWAY_TOKEN != ''
-        run: |
-          railway service set --numReplicas 2 --service=backend --environment=production
-          railway service set --numReplicas 2 --service=frontend --environment=production
-
-      - name: Enable autoscaling
-        if: env.RAILWAY_TOKEN != ''
-        run: |
-          echo "Configuring autoscaling for production..."
-          railway service set --autoscaling-cpu 70 --autoscaling-memory 80 \
-            --autoscaling-min 2 --autoscaling-max 5 --service=backend --environment=production
-          railway service set --autoscaling-cpu 70 --autoscaling-memory 80 \
-            --autoscaling-min 2 --autoscaling-max 5 --service=frontend --environment=production
+      # Replica counts and autoscaling are configured in railway.json.
+      # They are applied automatically on deploy.
 
   # ── Deploy to Target Host ────
   deploy:
