@@ -113,7 +113,15 @@ async function generateResponse(question, preferredSubject = null, _context = nu
     // Hugging Face Inference Providers (OpenAI-compatible endpoint)
     // Docs: https://huggingface.co/docs/inference-providers/index
     const API_URL = 'https://router.huggingface.co/v1/chat/completions';
-    const MODELS = ['Qwen/Qwen2.5-72B-Instruct', 'deepseek-ai/DeepSeek-R1-Distill-Qwen-32B'];
+    // Free-tier models from Hugging Face Inference Providers
+    // Prioritize models known to work without PRO subscription.
+    // Qwen 2.5 72B is ideal but requires credits; fall back to
+    // smaller free models that are reliably available.
+    const MODELS = [
+      'Qwen/Qwen2.5-72B-Instruct', // Primary — best quality (needs credits / PRO)
+      'Qwen/Qwen2.5-7B-Instruct', // Free-tier alternative — still strong
+      'mistralai/Mistral-7B-Instruct-v0.3', // Free-tier fallback
+    ];
 
     // Build system prompt for tutoring context
     const systemPrompt = `You are BrainBytes, a friendly and encouraging AI tutor for students. You explain concepts clearly, use examples when helpful, and keep responses concise (under 150 words). Be supportive and patient. ${preferredSubject ? `The student prefers ${preferredSubject}.` : ''}`;
