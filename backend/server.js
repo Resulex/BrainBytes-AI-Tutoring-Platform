@@ -47,10 +47,17 @@ const PORT = process.env.PORT || 3000;
 // ══════════════════════════════════════════════════════
 // Startup guard — crash immediately if critical secrets
 // are missing. Never run on insecure defaults.
+// At least one AI provider key must be present.
 // ══════════════════════════════════════════════════════
-const REQUIRED_ENV_VARS = ['JWT_SECRET', 'HUGGINGFACE_TOKEN'];
+const REQUIRED_ENV_VARS = ['JWT_SECRET'];
 
 const missingVars = REQUIRED_ENV_VARS.filter((name) => !process.env[name]);
+
+// Ensure at least one AI provider is configured
+const hasAIProvider = process.env.HUGGINGFACE_TOKEN || process.env.GEMINI_API_KEY;
+if (!hasAIProvider) {
+  missingVars.push('HUGGINGFACE_TOKEN or GEMINI_API_KEY');
+}
 
 if (missingVars.length > 0) {
   logger.error(

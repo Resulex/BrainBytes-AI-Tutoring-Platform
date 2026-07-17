@@ -511,6 +511,15 @@ Docker version 29.4.1, build 055a478
 - [Deployment Plan Documentation](https://docs.google.com/document/d/15uaHOPKM--08Mhd5ZjJibSCVzGSw3QeDIC_z69zGdeM/edit?usp=sharing)
 - [Milestone 2 Documentation](https://docs.google.com/document/d/1JGmgXinJhcwiIrOKrD6c6GpZu-I6txaua_B3yKzxFrA/edit?usp=sharing)
 
+## Monitoring Documentation
+
+- [BrainBytes Dashboards](https://drive.google.com/drive/folders/1r-i8CKsDfymlTeHVHrBwcfwtitcKvbzt?usp=sharing) — Grafana dashboard JSON exports
+- [BrainBytes Monitoring Advanced Dashboard](https://drive.google.com/drive/folders/1sqVuSoGaFP9AGqABA2Tsz97dU0B6uo5r?usp=sharing) — Advanced monitoring dashboards
+- [Alert Configuration Documentation](https://docs.google.com/document/d/1O9xIjYCqjK0AlVje4cViyk45C6hV2E6Wctur1984QDI/edit?usp=sharing) — Prometheus alert rules & runbooks
+- [Monitoring Demo Plan](https://docs.google.com/document/d/1xeDRW1RdHpdOWMpkVUIk5SQJt0KdmEY_FMY7_SKgp_c/edit?usp=sharing) — Demo script & traffic simulation guide
+- [Monitoring System & Advanced Dashboard Documentation](https://docs.google.com/document/d/1JlGy2X9Uyi_JKGiSRPdwQ72X8JmPdMfWCL_-oXtLorY/edit?usp=sharing) — Full monitoring system documentation
+- [Prometheus Monitoring System Documentation](https://docs.google.com/document/d/1j8BIOFXocZimIFqnOIYD4iBwv8BvNY7yFbYc8zhmrDY/edit?usp=sharing) — Prometheus setup & metrics configuration
+
 ### Implemented and Addressed Items
 
 **1a – Automated Docker Builds**

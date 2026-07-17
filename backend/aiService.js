@@ -110,133 +110,253 @@ async function generateResponse(question, preferredSubject = null, _context = nu
 
   // For other questions, try the API with a strict timeout
   try {
-    // Hugging Face Inference Providers (OpenAI-compatible endpoint)
-    // Docs: https://huggingface.co/docs/inference-providers/index
-    const API_URL = 'https://router.huggingface.co/v1/chat/completions';
-    // Free-tier models from Hugging Face Inference Providers
-    // Prioritize models known to work without PRO subscription.
-    // Qwen 2.5 72B is ideal but requires credits; fall back to
-    // smaller free models that are reliably available.
-    const MODELS = [
-      'Qwen/Qwen2.5-72B-Instruct', // Primary — best quality (needs credits / PRO)
-      'Qwen/Qwen2.5-7B-Instruct', // Free-tier alternative — still strong
-      'mistralai/Mistral-7B-Instruct-v0.3', // Free-tier fallback
-    ];
+    // ── Try local Ollama first (free, no API keys, always works) ──
+    const ollamaResult = await tryOllama(question, preferredSubject, category);
+    if (ollamaResult) return ollamaResult;
 
-    // Build system prompt for tutoring context
-    const systemPrompt = `You are BrainBytes, a friendly and encouraging AI tutor for students. You explain concepts clearly, use examples when helpful, and keep responses concise (under 150 words). Be supportive and patient. ${preferredSubject ? `The student prefers ${preferredSubject}.` : ''}`;
+    // ── Try Gemini (generous free tier: 15 req/min) ──
+    const geminiResult = await tryGemini(question, preferredSubject, category);
+    if (geminiResult) return geminiResult;
 
-    const token = process.env.HUGGINGFACE_TOKEN;
-    if (!token) {
-      console.warn('HUGGINGFACE_TOKEN not set. Skipping API call and using fallback.');
-      aiRequestErrors.inc({ model: 'none', error_type: 'missing_token' });
-      throw new Error('HUGGINGFACE_TOKEN not configured');
-    }
+    // ── Try Hugging Face as bonus (limited free credits) ──
+    const hfResult = await tryHuggingFace(question, preferredSubject, category);
+    if (hfResult) return hfResult;
 
-    let lastError = null;
-
-    for (const model of MODELS) {
-      let aiStart;
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-        aiStart = Date.now();
-
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          signal: controller.signal,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: question },
-            ],
-            max_tokens: 250,
-            temperature: 0.7,
-          }),
-        });
-
-        console.log(`API [${model}] status: ${response.status}`);
-        clearTimeout(timeoutId);
-
-        if (response.status === 401 || response.status === 403) {
-          const errorBody = await response.text();
-          console.error(`Authentication failed for [${model}]: ${errorBody}`);
-          throw new Error(
-            `Hugging Face API authentication failed (${response.status}). Check your HUGGINGFACE_TOKEN.`,
-          );
-        }
-
-        if (!response.ok) {
-          const errorBody = await response.text();
-          const aiDuration = (Date.now() - aiStart) / 1000;
-          aiRequestDuration.observe({ model, status: response.status }, aiDuration);
-          aiRequestErrors.inc({ model, error_type: `http_${response.status}` });
-          console.log(
-            `Model [${model}] failed: ${response.status} - ${errorBody.substring(0, 200)}`,
-          );
-          continue; // Try next model
-        }
-
-        const result = await response.json();
-
-        if (result.error) {
-          console.log(
-            `Model [${model}] returned error: ${JSON.stringify(result.error).substring(0, 200)}`,
-          );
-          continue;
-        }
-
-        const choice = result.choices && result.choices[0];
-        if (choice && choice.message) {
-          const content = choice.message.content || choice.message.reasoning_content || '';
-          if (content.trim()) {
-            const aiDuration = (Date.now() - aiStart) / 1000;
-            aiRequestDuration.observe({ model, status: 200 }, aiDuration);
-            return { category, response: content.trim() };
-          }
-        }
-
-        console.log(`Model [${model}] returned empty response, trying next...`);
-        aiRequestErrors.inc({ model, error_type: 'empty_response' });
-      } catch (modelError) {
-        const aiDuration = (Date.now() - aiStart) / 1000;
-
-        if (modelError.name === 'AbortError') {
-          console.log(`Model [${model}] timed out, trying next...`);
-          aiRequestDuration.observe({ model, status: 'timeout' }, aiDuration);
-          aiRequestErrors.inc({ model, error_type: 'timeout' });
-        } else if (modelError.message && modelError.message.includes('authentication failed')) {
-          // Auth failure is fatal - don't try other models
-          aiRequestDuration.observe({ model, status: 'auth_error' }, aiDuration);
-          aiRequestErrors.inc({ model, error_type: 'auth_failure' });
-          throw modelError;
-        } else {
-          console.log(
-            `Model [${model}] failed: ${modelError.message.split('\n')[0]}, trying next...`,
-          );
-          aiRequestDuration.observe({ model, status: 'error' }, aiDuration);
-          aiRequestErrors.inc({ model, error_type: 'other' });
-        }
-        lastError = modelError;
-      }
-    }
-
-    // All models failed - use fallback
-    throw lastError || new Error('All HuggingFace models unavailable');
+    // ── All failed — use hardcoded fallback ──
+    throw new Error('All AI providers unavailable');
   } catch (error) {
-    console.error('All Hugging Face API attempts failed:', error.message.split('\n')[0]);
+    console.error('All AI attempts failed:', error.message.split('\n')[0]);
     return {
       category,
       response: getDetailedResponse(category, question, questionType),
     };
   }
 }
+
+/**
+ * Try local Ollama (100% free, runs locally, no API keys).
+ * Uses OpenAI-compatible /v1/chat/completions endpoint.
+ * Docker → host: host.docker.internal:11434
+ */
+async function tryOllama(question, preferredSubject, category) {
+  const OLLAMA_URL = 'http://host.docker.internal:11434/v1/chat/completions';
+  const MODEL = 'gemma2:2b';
+  const TIMEOUT_MS = 30000;
+
+  const systemPrompt = `You are BrainBytes, a friendly and encouraging AI tutor for students. You explain concepts clearly, use examples when helpful, and keep responses concise (under 150 words). Be supportive and patient.${preferredSubject ? ` The student prefers ${preferredSubject}.` : ''}`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const aiStart = Date.now();
+
+    const response = await fetch(OLLAMA_URL, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: question },
+        ],
+        max_tokens: 250,
+        temperature: 0.7,
+        stream: false,
+      }),
+    });
+
+    console.log(`Ollama [${MODEL}] status: ${response.status}`);
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const body = await response.text();
+      const dur = (Date.now() - aiStart) / 1000;
+      aiRequestDuration.observe({ model: 'ollama-gemma2-2b', status: response.status }, dur);
+      aiRequestErrors.inc({ model: 'ollama-gemma2-2b', error_type: `http_${response.status}` });
+      console.log(`Ollama failed: ${response.status} - ${body.substring(0, 200)}`);
+      return null;
+    }
+
+    const result = await response.json();
+    const content = result.choices?.[0]?.message?.content;
+    if (content?.trim()) {
+      const dur = (Date.now() - aiStart) / 1000;
+      aiRequestDuration.observe({ model: 'ollama-gemma2-2b', status: 200 }, dur);
+      return { category, response: content.trim() };
+    }
+
+    console.log('Ollama empty response');
+    aiRequestErrors.inc({ model: 'ollama-gemma2-2b', error_type: 'empty_response' });
+    return null;
+  } catch (err) {
+    console.log(`Ollama error (is Ollama running?): ${err.message.split('\n')[0]}`);
+    aiRequestErrors.inc({ model: 'ollama-gemma2-2b', error_type: err.name === 'AbortError' ? 'timeout' : 'other' });
+    return null;
+  }
+}
+
+/**
+ * Try Hugging Face Inference Providers (OpenAI-compatible router).
+ * Returns { category, response } on success, null on failure.
+ */
+async function tryHuggingFace(question, preferredSubject, category) {
+  const API_URL = 'https://router.huggingface.co/v1/chat/completions';
+  const MODELS = ['Qwen/Qwen2.5-72B-Instruct'];
+  const TIMEOUT_MS = 45000;
+
+  const systemPrompt = `You are BrainBytes, a friendly and encouraging AI tutor for students. You explain concepts clearly, use examples when helpful, and keep responses concise (under 150 words). Be supportive and patient. ${preferredSubject ? `The student prefers ${preferredSubject}.` : ''}`;
+
+  const token = process.env.HUGGINGFACE_TOKEN;
+  if (!token) {
+    console.warn('HUGGINGFACE_TOKEN not set — skipping HF');
+    return null;
+  }
+
+  for (const model of MODELS) {
+    let aiStart;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      aiStart = Date.now();
+
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: question },
+          ],
+          max_tokens: 250,
+          temperature: 0.7,
+        }),
+      });
+
+      console.log(`HF [${model}] status: ${response.status}`);
+      clearTimeout(timeoutId);
+
+      if (response.status === 402) {
+        // Credits depleted — no point retrying HF
+        const body = await response.text();
+        console.log(`HF credits depleted: ${body.substring(0, 150)}`);
+        return null;
+      }
+
+      if (response.status === 401 || response.status === 403) {
+        const body = await response.text();
+        console.error(`HF auth failed: ${body}`);
+        return null;
+      }
+
+      if (!response.ok) {
+        const body = await response.text();
+        const dur = (Date.now() - aiStart) / 1000;
+        aiRequestDuration.observe({ model, status: response.status }, dur);
+        aiRequestErrors.inc({ model, error_type: `http_${response.status}` });
+        console.log(`HF [${model}] failed: ${response.status} - ${body.substring(0, 150)}`);
+        continue;
+      }
+
+      const result = await response.json();
+      if (result.error) {
+        console.log(`HF [${model}] error: ${JSON.stringify(result.error).substring(0, 150)}`);
+        continue;
+      }
+
+      const content = result.choices?.[0]?.message?.content;
+      if (content?.trim()) {
+        const dur = (Date.now() - aiStart) / 1000;
+        aiRequestDuration.observe({ model, status: 200 }, dur);
+        return { category, response: content.trim() };
+      }
+
+      console.log(`HF [${model}] empty response`);
+      aiRequestErrors.inc({ model, error_type: 'empty_response' });
+    } catch (err) {
+      const dur = aiStart ? (Date.now() - aiStart) / 1000 : 0;
+      if (err.name === 'AbortError') {
+        console.log(`HF [${model}] timed out`);
+        aiRequestDuration.observe({ model, status: 'timeout' }, dur);
+        aiRequestErrors.inc({ model, error_type: 'timeout' });
+      } else {
+        console.log(`HF [${model}] error: ${err.message.split('\n')[0]}`);
+        aiRequestDuration.observe({ model, status: 'error' }, dur);
+        aiRequestErrors.inc({ model, error_type: 'other' });
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Try Google Gemini (generous free tier: 15 req/min, 1M tokens/day).
+ * Falls back silently if GEMINI_API_KEY is not configured.
+ */
+async function tryGemini(question, preferredSubject, category) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.log('GEMINI_API_KEY not set — skipping Gemini fallback');
+    return null;
+  }
+
+  const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const TIMEOUT_MS = 30000;
+
+  const systemPrompt = `You are BrainBytes, a friendly and encouraging AI tutor for students. Explain concepts clearly, use examples when helpful, and keep responses concise (under 150 words). Be supportive and patient.${preferredSubject ? ` The student prefers ${preferredSubject}.` : ''}`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const aiStart = Date.now();
+
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text: question }] }],
+        generationConfig: { maxOutputTokens: 250, temperature: 0.7 },
+      }),
+    });
+
+    console.log(`Gemini status: ${response.status}`);
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const body = await response.text();
+      const dur = (Date.now() - aiStart) / 1000;
+      aiRequestDuration.observe({ model: 'gemini-2.0-flash', status: response.status }, dur);
+      aiRequestErrors.inc({ model: 'gemini-2.0-flash', error_type: `http_${response.status}` });
+      console.log(`Gemini failed: ${response.status} - ${body.substring(0, 200)}`);
+      return null;
+    }
+
+    const result = await response.json();
+    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (text?.trim()) {
+      const dur = (Date.now() - aiStart) / 1000;
+      aiRequestDuration.observe({ model: 'gemini-2.0-flash', status: 200 }, dur);
+      return { category, response: text.trim() };
+    }
+
+    console.log('Gemini empty response');
+    aiRequestErrors.inc({ model: 'gemini-2.0-flash', error_type: 'empty_response' });
+    return null;
+  } catch (err) {
+    console.log(`Gemini error: ${err.message.split('\n')[0]}`);
+    aiRequestErrors.inc({ model: 'gemini-2.0-flash', error_type: err.name === 'AbortError' ? 'timeout' : 'other' });
+    return null;
+  }
+}
+
 function detectQuestionType(question) {
   const lower = question.toLowerCase();
   const isDefinition = /^what (is|are|does)|define|meaning\b/.test(lower);

@@ -44,6 +44,7 @@ services:
       - "9080:9080"
     environment:
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-placeholder-for-ci}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - JWT_SECRET=${JWT_SECRET:-brainbytes-ci-jwt-secret}
       - NODE_ENV=${NODE_ENV:-production}
       - MONGODB_URI=${MONGODB_URI:-mongodb://mongo:27017/brainbytes}
