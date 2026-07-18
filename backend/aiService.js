@@ -108,121 +108,19 @@ async function generateResponse(question, preferredSubject = null, _context = nu
     };
   }
 
-  // For other questions, try the API with a strict timeout
+  // For other questions, try APIs with cascading fallbacks
   try {
-    // Hugging Face Inference Providers (OpenAI-compatible endpoint)
-    // Docs: https://huggingface.co/docs/inference-providers/index
-    const API_URL = 'https://router.huggingface.co/v1/chat/completions';
-    const MODELS = ['Qwen/Qwen2.5-72B-Instruct', 'deepseek-ai/DeepSeek-R1-Distill-Qwen-32B'];
+    const orToken = process.env.OPENROUTER_API_KEY;
 
-    // Build system prompt for tutoring context
-    const systemPrompt = `You are BrainBytes, a friendly and encouraging AI tutor for students. You explain concepts clearly, use examples when helpful, and keep responses concise (under 150 words). Be supportive and patient. ${preferredSubject ? `The student prefers ${preferredSubject}.` : ''}`;
-
-    const token = process.env.HUGGINGFACE_TOKEN;
-    if (!token) {
-      console.warn('HUGGINGFACE_TOKEN not set. Skipping API call and using fallback.');
-      aiRequestErrors.inc({ model: 'none', error_type: 'missing_token' });
-      throw new Error('HUGGINGFACE_TOKEN not configured');
+    // Skip HuggingFace (DNS broken in Docker) — go straight to OpenRouter
+    if (orToken) {
+      const orResult = await tryOpenRouter(question, preferredSubject, orToken);
+      if (orResult) return orResult;
     }
 
-    let lastError = null;
-
-    for (const model of MODELS) {
-      let aiStart;
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-        aiStart = Date.now();
-
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          signal: controller.signal,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: question },
-            ],
-            max_tokens: 250,
-            temperature: 0.7,
-          }),
-        });
-
-        console.log(`API [${model}] status: ${response.status}`);
-        clearTimeout(timeoutId);
-
-        if (response.status === 401 || response.status === 403) {
-          const errorBody = await response.text();
-          console.error(`Authentication failed for [${model}]: ${errorBody}`);
-          throw new Error(
-            `Hugging Face API authentication failed (${response.status}). Check your HUGGINGFACE_TOKEN.`,
-          );
-        }
-
-        if (!response.ok) {
-          const errorBody = await response.text();
-          const aiDuration = (Date.now() - aiStart) / 1000;
-          aiRequestDuration.observe({ model, status: response.status }, aiDuration);
-          aiRequestErrors.inc({ model, error_type: `http_${response.status}` });
-          console.log(
-            `Model [${model}] failed: ${response.status} - ${errorBody.substring(0, 200)}`,
-          );
-          continue; // Try next model
-        }
-
-        const result = await response.json();
-
-        if (result.error) {
-          console.log(
-            `Model [${model}] returned error: ${JSON.stringify(result.error).substring(0, 200)}`,
-          );
-          continue;
-        }
-
-        const choice = result.choices && result.choices[0];
-        if (choice && choice.message) {
-          const content = choice.message.content || choice.message.reasoning_content || '';
-          if (content.trim()) {
-            const aiDuration = (Date.now() - aiStart) / 1000;
-            aiRequestDuration.observe({ model, status: 200 }, aiDuration);
-            return { category, response: content.trim() };
-          }
-        }
-
-        console.log(`Model [${model}] returned empty response, trying next...`);
-        aiRequestErrors.inc({ model, error_type: 'empty_response' });
-      } catch (modelError) {
-        const aiDuration = (Date.now() - aiStart) / 1000;
-
-        if (modelError.name === 'AbortError') {
-          console.log(`Model [${model}] timed out, trying next...`);
-          aiRequestDuration.observe({ model, status: 'timeout' }, aiDuration);
-          aiRequestErrors.inc({ model, error_type: 'timeout' });
-        } else if (modelError.message && modelError.message.includes('authentication failed')) {
-          // Auth failure is fatal - don't try other models
-          aiRequestDuration.observe({ model, status: 'auth_error' }, aiDuration);
-          aiRequestErrors.inc({ model, error_type: 'auth_failure' });
-          throw modelError;
-        } else {
-          console.log(
-            `Model [${model}] failed: ${modelError.message.split('\n')[0]}, trying next...`,
-          );
-          aiRequestDuration.observe({ model, status: 'error' }, aiDuration);
-          aiRequestErrors.inc({ model, error_type: 'other' });
-        }
-        lastError = modelError;
-      }
-    }
-
-    // All models failed - use fallback
-    throw lastError || new Error('All HuggingFace models unavailable');
+    throw new Error('All AI providers unavailable');
   } catch (error) {
-    console.error('All Hugging Face API attempts failed:', error.message.split('\n')[0]);
+    console.error('All AI provider attempts failed:', error.message.split('\n')[0]);
     return {
       category,
       response: getDetailedResponse(category, question, questionType),
@@ -637,6 +535,188 @@ function formatHistoryResponse(question) {
     return 'History is full of interesting events and developments! The story of the Philippines includes ancient kingdoms, Spanish colonization, the Philippine Revolution, American rule, World War II, and the journey to becoming the vibrant nation it is today. What would you like to learn about?';
   }
   return 'History connects us to the past and helps us understand the present! I can tell you about Philippine history, world wars, ancient civilizations, revolutions, and important historical figures. What period or event interests you most?';
+}
+
+// ── Free Serverless API fallback (no credits needed, rate-limited) ──
+// Uses HuggingFace's free inference API: https://huggingface.co/docs/api-inference
+async function tryServerlessFallback(question, token) {
+  // Models known to work reliably on the free serverless tier
+  const FREE_MODELS = [
+    'mistralai/Mistral-7B-Instruct-v0.3',
+    'HuggingFaceH4/zephyr-7b-beta',
+    'google/gemma-2-2b-it',
+    'microsoft/Phi-3-mini-4k-instruct',
+    'meta-llama/Llama-3.2-1B-Instruct',
+    'mistralai/Mistral-Nemo-Instruct-2407',
+  ];
+
+  for (const model of FREE_MODELS) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+      console.log(`Serverless API [${model}] attempting...`);
+
+      const response = await fetch(
+        `https://api-inference.huggingface.co/models/${model}`,
+        {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            inputs: `<|system|>You are BrainBytes, a friendly AI tutor. Keep responses concise (under 150 words). Be supportive and patient.</s><|user|>${question}</s><|assistant|>`,
+            parameters: {
+              max_new_tokens: 500,
+              temperature: 0.7,
+              return_full_text: false,
+            },
+          }),
+        },
+      );
+
+      clearTimeout(timeoutId);
+      console.log(`Serverless [${model}] status: ${response.status}`);
+
+      if (response.status === 503) {
+        // Model is loading — wait and retry this model
+        const estimatedTime = response.headers.get('estimated-time') || '?';
+        console.log(`Serverless [${model}] loading (ETA: ${estimatedTime}s), trying next...`);
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.log(`Serverless [${model}] failed: ${response.status} - ${errorBody.substring(0, 200)}`);
+        continue;
+      }
+
+      const result = await response.json();
+
+      // Handle different response formats
+      let text = null;
+      if (Array.isArray(result) && result[0]?.generated_text) {
+        text = result[0].generated_text.trim();
+      } else if (result.generated_text) {
+        text = result.generated_text.trim();
+      } else if (result.summary_text) {
+        text = result.summary_text.trim();
+      } else if (result[0]?.summary_text) {
+        text = result[0].summary_text.trim();
+      }
+
+      if (text) {
+        console.log(`Serverless [${model}] succeeded!`);
+        return { category: 'general', response: text };
+      }
+
+      console.log(`Serverless [${model}] returned empty response.`);
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log(`Serverless [${model}] timed out.`);
+      } else {
+        console.log(`Serverless [${model}] error: ${error.message.split('\\n')[0]}`);
+      }
+    }
+  }
+
+  console.log('All serverless models failed.');
+  return null;
+}
+
+// ── OpenRouter fallback (cheap paid first, then free) ──
+// OpenRouter provides unified API access: https://openrouter.ai
+async function tryOpenRouter(question, preferredSubject, apiKey) {
+  // Tier 2a: Cheap paid models (fractions of a cent per request)
+  const PAID_MODELS = [
+    'google/gemini-2.5-flash-lite',      // Google's cheapest flash model
+    'meta-llama/llama-3.2-1b-instruct',  // Dirt cheap tiny model
+    'meta-llama/llama-3.2-3b-instruct',  // Very cheap, good quality
+    'deepseek/deepseek-v4-flash',        // Cheap & fast
+  ];
+
+  // Tier 2b: Free models ($0.00, rate-limited)
+  const FREE_MODELS = [
+    'google/gemma-4-26b-a4b-it:free',        // Google Gemma 4 26B
+    'google/gemma-4-31b-it:free',            // Google Gemma 4 31B
+    'meta-llama/llama-3.2-3b-instruct:free', // Llama 3.2 3B
+    'nvidia/nemotron-nano-9b-v2:free',       // NVIDIA fast model
+    'qwen/qwen3-coder:free',                 // Qwen for coding
+    'openai/gpt-oss-20b:free',               // OpenAI open source
+  ];
+
+  const systemPrompt = `You are BrainBytes, a friendly and encouraging AI tutor for students. You explain concepts clearly, use examples when helpful, and keep responses concise (under 150 words). Be supportive and patient. ${preferredSubject ? `The student prefers ${preferredSubject}.` : ''}`;
+
+  // Try paid models first, then free
+  for (const tier of [
+    { name: 'paid', models: PAID_MODELS },
+    { name: 'free', models: FREE_MODELS },
+  ]) {
+    for (const model of tier.models) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+        console.log(`OpenRouter [${tier.name}] ${model} attempting...`);
+
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+            'HTTP-Referer': 'http://localhost:3000',
+            'X-Title': 'BrainBytes AI Tutor',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: question },
+            ],
+            max_tokens: 500,
+            temperature: 0.7,
+          }),
+        });
+
+        clearTimeout(timeoutId);
+        console.log(`OpenRouter [${model}] status: ${response.status}`);
+
+        if (response.status === 401 || response.status === 403) {
+          const errorBody = await response.text();
+          console.error(`OpenRouter auth failed: ${errorBody.substring(0, 200)}`);
+          return null; // Don't bother trying other models if auth fails
+        }
+
+        if (!response.ok) {
+          const errorBody = await response.text();
+          console.log(`OpenRouter [${model}] failed: ${response.status} - ${errorBody.substring(0, 200)}`);
+          continue;
+        }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content?.trim();
+
+        if (content) {
+          console.log(`OpenRouter [${model}] succeeded!`);
+          return { category: 'general', response: content };
+        }
+
+        console.log(`OpenRouter [${model}] returned empty response.`);
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          console.log(`OpenRouter [${model}] timed out.`);
+        } else {
+          console.log(`OpenRouter [${model}] error: ${error.message.split('\\n')[0]}`);
+        }
+      }
+    }
+  }
+
+  console.log('All OpenRouter models failed.');
+  return null;
 }
 
 module.exports = {

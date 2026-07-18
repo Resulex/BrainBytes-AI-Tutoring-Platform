@@ -39,11 +39,15 @@ services:
   # Backend API container
   backend:
     build: ./backend
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     ports:
       - "3000:3000"
       - "9080:9080"
     environment:
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-placeholder-for-ci}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - JWT_SECRET=${JWT_SECRET:-brainbytes-ci-jwt-secret}
       - NODE_ENV=${NODE_ENV:-production}
       - MONGODB_URI=${MONGODB_URI:-mongodb://mongo:27017/brainbytes}
