@@ -557,25 +557,22 @@ async function tryServerlessFallback(question, token) {
 
       console.log(`Serverless API [${model}] attempting...`);
 
-      const response = await fetch(
-        `https://api-inference.huggingface.co/models/${model}`,
-        {
-          method: 'POST',
-          signal: controller.signal,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            inputs: `<|system|>You are BrainBytes, a friendly AI tutor. Keep responses concise (under 150 words). Be supportive and patient.</s><|user|>${question}</s><|assistant|>`,
-            parameters: {
-              max_new_tokens: 500,
-              temperature: 0.7,
-              return_full_text: false,
-            },
-          }),
+      const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify({
+          inputs: `<|system|>You are BrainBytes, a friendly AI tutor. Keep responses concise (under 150 words). Be supportive and patient.</s><|user|>${question}</s><|assistant|>`,
+          parameters: {
+            max_new_tokens: 500,
+            temperature: 0.7,
+            return_full_text: false,
+          },
+        }),
+      });
 
       clearTimeout(timeoutId);
       console.log(`Serverless [${model}] status: ${response.status}`);
@@ -589,7 +586,9 @@ async function tryServerlessFallback(question, token) {
 
       if (!response.ok) {
         const errorBody = await response.text();
-        console.log(`Serverless [${model}] failed: ${response.status} - ${errorBody.substring(0, 200)}`);
+        console.log(
+          `Serverless [${model}] failed: ${response.status} - ${errorBody.substring(0, 200)}`,
+        );
         continue;
       }
 
@@ -631,20 +630,20 @@ async function tryServerlessFallback(question, token) {
 async function tryOpenRouter(question, preferredSubject, apiKey) {
   // Tier 2a: Cheap paid models (fractions of a cent per request)
   const PAID_MODELS = [
-    'google/gemini-2.5-flash-lite',      // Google's cheapest flash model
-    'meta-llama/llama-3.2-1b-instruct',  // Dirt cheap tiny model
-    'meta-llama/llama-3.2-3b-instruct',  // Very cheap, good quality
-    'deepseek/deepseek-v4-flash',        // Cheap & fast
+    'google/gemini-2.5-flash-lite', // Google's cheapest flash model
+    'meta-llama/llama-3.2-1b-instruct', // Dirt cheap tiny model
+    'meta-llama/llama-3.2-3b-instruct', // Very cheap, good quality
+    'deepseek/deepseek-v4-flash', // Cheap & fast
   ];
 
   // Tier 2b: Free models ($0.00, rate-limited)
   const FREE_MODELS = [
-    'google/gemma-4-26b-a4b-it:free',        // Google Gemma 4 26B
-    'google/gemma-4-31b-it:free',            // Google Gemma 4 31B
+    'google/gemma-4-26b-a4b-it:free', // Google Gemma 4 26B
+    'google/gemma-4-31b-it:free', // Google Gemma 4 31B
     'meta-llama/llama-3.2-3b-instruct:free', // Llama 3.2 3B
-    'nvidia/nemotron-nano-9b-v2:free',       // NVIDIA fast model
-    'qwen/qwen3-coder:free',                 // Qwen for coding
-    'openai/gpt-oss-20b:free',               // OpenAI open source
+    'nvidia/nemotron-nano-9b-v2:free', // NVIDIA fast model
+    'qwen/qwen3-coder:free', // Qwen for coding
+    'openai/gpt-oss-20b:free', // OpenAI open source
   ];
 
   const systemPrompt = `You are BrainBytes, a friendly and encouraging AI tutor for students. You explain concepts clearly, use examples when helpful, and keep responses concise (under 150 words). Be supportive and patient. ${preferredSubject ? `The student prefers ${preferredSubject}.` : ''}`;
@@ -692,7 +691,9 @@ async function tryOpenRouter(question, preferredSubject, apiKey) {
 
         if (!response.ok) {
           const errorBody = await response.text();
-          console.log(`OpenRouter [${model}] failed: ${response.status} - ${errorBody.substring(0, 200)}`);
+          console.log(
+            `OpenRouter [${model}] failed: ${response.status} - ${errorBody.substring(0, 200)}`,
+          );
           continue;
         }
 
