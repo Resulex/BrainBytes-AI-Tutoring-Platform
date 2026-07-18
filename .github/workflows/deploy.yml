@@ -167,67 +167,6 @@ jobs:
       # Trivy vulnerability scans happen in BrainBytes CI/CD (main.yml).
       # They are not duplicated here to avoid conflicting Code Scanning configurations.
 
-  # ── Deploy to Railway.app ────
-  deploy-railway:
-    name: Deploy Railway
-    needs: build-and-push
-    if: |
-      always() &&
-      needs.build-and-push.result == 'success'
-    runs-on: ubuntu-latest
-    environment:
-      name: production
-    timeout-minutes: 15
-
-    steps:
-      - name: Check out repository
-        if: env.RAILWAY_TOKEN != ''
-        uses: actions/checkout@v4
-
-      - name: Deploy backend to Railway
-        if: env.RAILWAY_TOKEN != ''
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: |
-          RETRY_DELAYS=(15 60 120)
-          for i in 0 1 2; do
-            ATTEMPT=$((i + 1))
-            echo "Attempt $ATTEMPT: Deploying backend to Railway (production)..."
-            if npx @railway/cli up --service=backend --environment=production --detach; then
-              echo "Backend uploaded successfully."
-              break
-            fi
-            if [[ $i -lt 2 ]]; then
-              echo "Upload failed, retrying in ${RETRY_DELAYS[$i]}s..."
-              sleep "${RETRY_DELAYS[$i]}"
-            else
-              echo "Backend deploy failed after 3 attempts."
-              exit 1
-            fi
-          done
-
-      - name: Deploy frontend to Railway
-        if: env.RAILWAY_TOKEN != ''
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: |
-          RETRY_DELAYS=(15 60 120)
-          for i in 0 1 2; do
-            ATTEMPT=$((i + 1))
-            echo "Attempt $ATTEMPT: Deploying frontend to Railway (production)..."
-            if npx @railway/cli up --service=frontend --environment=production --detach; then
-              echo "Frontend uploaded successfully."
-              break
-            fi
-            if [[ $i -lt 2 ]]; then
-              echo "Upload failed, retrying in ${RETRY_DELAYS[$i]}s..."
-              sleep "${RETRY_DELAYS[$i]}"
-            else
-              echo "Frontend deploy failed after 3 attempts."
-              exit 1
-            fi
-          done
-
   # ── Deploy to Target Host ────
   deploy:
     name: Deploy
@@ -455,7 +394,7 @@ jobs:
   # ── Notify ──
   notify:
     name: Notify
-    needs: [e2e-gate, deploy, deploy-railway, verify, rollback]
+    needs: [e2e-gate, deploy, verify, rollback]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -484,7 +423,6 @@ jobs:
             | E2E Gate        | ${{ needs.e2e-gate.result }}             |
             | Build           | ${{ needs.build-and-push.result }}        |
             | Deploy (SSH)    | ${{ needs.deploy.result }}                |
-            | Deploy (Railway)| ${{ needs.deploy-railway.result }}        |
             | Verify          | ${{ needs.verify.result }}                |
             | Rollback        | ${{ needs.rollback.result }}              |
             | Triggered by    | ${{ github.actor }}                      |
