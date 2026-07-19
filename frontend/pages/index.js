@@ -461,7 +461,7 @@ export default function Home() {
     <div style={styles.container}>
       <div style={styles.header}>
         <div>
-          <h1 style={styles.headerTitle}>BrainBytes AI Tutor Demo</h1>
+          <h1 style={styles.headerTitle}>BrainBytes AI Tutor</h1>
           <p style={styles.headerSubtitle}>
             {isConnected ? '🟢 Connected' : '🔴 Offline'} • {isAuthenticated ? user?.name : 'Guest'}
           </p>
